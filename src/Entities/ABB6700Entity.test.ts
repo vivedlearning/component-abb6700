@@ -220,4 +220,28 @@ describe("ABB6700Entity", () => {
       expect(entity2.j1.degrees).toBe(0);
     });
   });
+
+  describe("Stabilizer Computation", () => {
+    let entity: ABB6700Entity;
+
+    beforeEach(() => {
+      const appObject = appObjects.getOrCreate("test-arm");
+      entity = makeABB6700Entity(appObject);
+    });
+
+    it("defaults to zero angle and extension", () => {
+      expect(entity.stabilizerAngle.radians).toBe(0);
+      expect(entity.stabilizerExtension).toBe(0);
+    });
+
+    it("can set and get stabilizerAngle", () => {
+      entity.stabilizerAngle = Angle.FromDegrees(15);
+      expect(entity.stabilizerAngle.degrees).toBe(15);
+    });
+
+    it("can set and get stabilizerExtension", () => {
+      entity.stabilizerExtension = 0.05;
+      expect(entity.stabilizerExtension).toBe(0.05);
+    });
+  });
 });

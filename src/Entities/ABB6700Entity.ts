@@ -34,6 +34,12 @@ export abstract class ABB6700Entity extends AppObjectEntity {
   abstract get j6(): Angle;
   abstract set j6(val: Angle);
 
+  abstract get stabilizerAngle(): Angle;
+  abstract set stabilizerAngle(val: Angle);
+
+  abstract get stabilizerExtension(): number;
+  abstract set stabilizerExtension(val: number);
+
   static get(appObj: AppObject): ABB6700Entity | undefined {
     return appObj.getComponent<ABB6700Entity>(this.type);
   }
@@ -87,6 +93,11 @@ class ABB6700EntityImp extends ABB6700Entity {
     Angle.FromDegrees(0),
     this.notifyOnChange,
   );
+  private memoizedStabilizerAngle = new MemoizedAngle(
+    Angle.FromDegrees(0),
+    this.notifyOnChange,
+  );
+  private _stabilizerExtension = 0;
 
   get j1() {
     return this.memoizedJ1.val;
@@ -128,6 +139,22 @@ class ABB6700EntityImp extends ABB6700Entity {
   }
   set j6(val: Angle) {
     this.memoizedJ6.val = val;
+  }
+
+  get stabilizerAngle(): Angle {
+    return this.memoizedStabilizerAngle.val;
+  }
+  set stabilizerAngle(val: Angle) {
+    this.memoizedStabilizerAngle.val = val;
+  }
+
+  get stabilizerExtension(): number {
+    return this._stabilizerExtension;
+  }
+  set stabilizerExtension(val: number) {
+    if (this._stabilizerExtension === val) return;
+    this._stabilizerExtension = val;
+    this.notifyOnChange();
   }
 
   constructor(appObject: AppObject) {

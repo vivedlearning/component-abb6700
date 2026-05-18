@@ -147,6 +147,8 @@ describe("ABB6700PM", () => {
         j4: Angle.FromDegrees(40),
         j5: Angle.FromDegrees(50),
         j6: Angle.FromDegrees(60),
+        stabilizerAngle: Angle.FromDegrees(5),
+        stabilizerExtension: 0.01,
       };
       const vm2: ABB6700VM = {
         j1: Angle.FromDegrees(10),
@@ -155,6 +157,8 @@ describe("ABB6700PM", () => {
         j4: Angle.FromDegrees(40),
         j5: Angle.FromDegrees(50),
         j6: Angle.FromDegrees(60),
+        stabilizerAngle: Angle.FromDegrees(5),
+        stabilizerExtension: 0.01,
       };
 
       expect(pm.vmsAreEqual(vm1, vm2)).toBe(true);
@@ -168,6 +172,8 @@ describe("ABB6700PM", () => {
         j4: Angle.FromDegrees(0),
         j5: Angle.FromDegrees(0),
         j6: Angle.FromDegrees(0),
+        stabilizerAngle: Angle.FromDegrees(0),
+        stabilizerExtension: 0,
       };
       const vm2: ABB6700VM = {
         j1: Angle.FromDegrees(20),
@@ -176,6 +182,8 @@ describe("ABB6700PM", () => {
         j4: Angle.FromDegrees(0),
         j5: Angle.FromDegrees(0),
         j6: Angle.FromDegrees(0),
+        stabilizerAngle: Angle.FromDegrees(0),
+        stabilizerExtension: 0,
       };
 
       expect(pm.vmsAreEqual(vm1, vm2)).toBe(false);

@@ -15,6 +15,8 @@ export const aBB6700PMAdapter: PmAdapter<ABB6700VM> = {
     j4: Angle.FromDegrees(0),
     j5: Angle.FromDegrees(0),
     j6: Angle.FromDegrees(0),
+    stabilizerAngle: Angle.FromDegrees(0),
+    stabilizerExtension: 0,
   },
 
   subscribe: (

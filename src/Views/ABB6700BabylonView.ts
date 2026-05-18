@@ -53,6 +53,9 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
   private j4Node: TransformNode | undefined;
   private j5Node: TransformNode | undefined;
   private j6Node: TransformNode | undefined;
+  private stabilizerRotationNode: TransformNode | undefined;
+  private stabilizerPrismaticNode: TransformNode | undefined;
+  private stabilizerPrismaticRestZ = 0;
 
   async setupView(): Promise<void> {
     this.pm = this.getCachedLocalComponent<ABB6700PM>(ABB6700PM.type);
@@ -75,6 +78,8 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
     this.j4Node = undefined;
     this.j5Node = undefined;
     this.j6Node = undefined;
+    this.stabilizerRotationNode = undefined;
+    this.stabilizerPrismaticNode = undefined;
 
     const allNodes: TransformNode[] = [...meshes, ...transformNodes];
 
@@ -99,6 +104,12 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
         case "joint_6":
           this.j6Node = node;
           break;
+        case "stabilizer_joint_1":
+          this.stabilizerRotationNode = node;
+          break;
+        case "stabilizer_joint_2":
+          this.stabilizerPrismaticNode = node;
+          break;
       }
     }
 
@@ -111,11 +122,22 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
       this.j4Node,
       this.j5Node,
       this.j6Node,
+      this.stabilizerRotationNode,
     ];
     for (const node of jointNodes) {
       if (node && node.rotationQuaternion) {
         node.rotationQuaternion = null;
       }
+    }
+
+    // Capture the prismatic joint's rest position
+    if (this.stabilizerPrismaticNode) {
+      this.stabilizerPrismaticRestZ = this.stabilizerPrismaticNode.position.z;
+    }
+
+    // Apply current state to the newly bound meshes
+    if (this.pm?.lastVM) {
+      this.applyView(this.pm.lastVM);
     }
   }
 
@@ -135,6 +157,11 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
     if (this.j4Node) this.j4Node.rotation.z = vm.j4.radians;
     if (this.j5Node) this.j5Node.rotation.z = vm.j5.radians;
     if (this.j6Node) this.j6Node.rotation.z = vm.j6.radians;
+    if (this.stabilizerRotationNode)
+      this.stabilizerRotationNode.rotation.z = vm.stabilizerAngle.radians;
+    if (this.stabilizerPrismaticNode)
+      this.stabilizerPrismaticNode.position.z =
+        this.stabilizerPrismaticRestZ + vm.stabilizerExtension;
   };
 
   dispose(): void {

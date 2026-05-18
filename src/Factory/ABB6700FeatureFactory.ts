@@ -6,6 +6,7 @@ import {
   makeABB6700Repo,
 } from "../Entities/ABB6700Repo";
 import { makeABB6700PM } from "../PMs/ABB6700PM";
+import { makeCalcStabilizerUC } from "../UCs/CalcStabilizerUC";
 import { makeSetJointAngleUC } from "../UCs/SetJointAngleUC";
 
 /**
@@ -65,6 +66,7 @@ function makeABB6700InstanceFactory(
     const ao = appObjects.getOrCreate(id);
     const entity = makeABB6700Entity(ao);
     makeSetJointAngleUC(ao);
+    makeCalcStabilizerUC(ao);
     makeABB6700PM(ao);
     return entity;
   };
