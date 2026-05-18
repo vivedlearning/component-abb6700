@@ -3,6 +3,7 @@ import "@babylonjs/inspector";
 import {
   ArcRotateCamera,
   Color4,
+  CubeTexture,
   Engine,
   HemisphericLight,
   InspectableType,
@@ -49,6 +50,10 @@ const camera = new ArcRotateCamera(
   scene,
 );
 camera.attachControl(canvas, true);
+camera.wheelPrecision = 50;
+
+const envTexture = CubeTexture.CreateFromPrefilteredData("/studio.env", scene);
+scene.environmentTexture = envTexture;
 
 const mainLight = new HemisphericLight(
   "mainLight",
