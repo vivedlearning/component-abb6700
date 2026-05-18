@@ -1,0 +1,26 @@
+# Source & development files
+src/
+dev/
+scripts/
+public/
+assets/
+
+# Config & tooling
+*.config.ts
+*.config.js
+tsconfig*.json
+vitest.setup.ts
+eslint.config.js
+.gitattributes
+
+# Test & coverage
+coverage/
+**/*.test.ts
+
+# IDE & OS
+.vscode/
+.DS_Store
+
+# Docs (keep README)
+COMPONENT_KNOWLEDGE.md
+CHANGELOG.md
