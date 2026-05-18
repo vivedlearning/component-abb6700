@@ -12,5 +12,5 @@ export default {
   multiInstance: true,
 
   /** 3D asset files to include in the build */
-  assets: [],
+  assets: ["8a448235-bed3-4f2b-b934-848c6fad43ed"],
 };
