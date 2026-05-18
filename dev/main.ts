@@ -5,18 +5,23 @@ import {
   Color4,
   Engine,
   HemisphericLight,
+  InspectableType,
   Scene,
   SceneLoader,
   Vector3,
 } from "@babylonjs/core";
-import { makeAppObjectRepo, makeDomainFactoryRepo } from "@vived/core";
+import { Angle, makeAppObjectRepo, makeDomainFactoryRepo } from "@vived/core";
 import { getAssetBlobURL } from "@vived/app";
 import {
+  ABB6700Entity,
   ABB6700Repo,
+  SetJointAngleUC,
   makeABB6700BabylonView,
   makeABB6700FeatureFactory,
   componentConfig,
+  type ABB6700Joint,
 } from "../src";
+import { setJointAngle } from "../src/Controllers/setJointAngle";
 import { makeDevGetAssetBlobURLUC } from "./DevGetAssetBlobURLUC";
 
 const INSTANCE_ID = "dev-aBB6700-1";
@@ -75,20 +80,98 @@ await view.setupView();
 
 // ─── Load 3D Asset ───────────────────────────────────────────────────────────
 
-// TODO: Add your .glb file to the public/ directory and update component.config.ts
-// with the asset ID. Then uncomment the lines below:
-//
-// const defaultAsset = componentConfig.assets[0];
-// const blobURL = await getAssetBlobURL(defaultAsset.id, appObjects);
-// const importResult = await SceneLoader.ImportMeshAsync(
-//   "",
-//   blobURL,
-//   "",
-//   scene,
-//   undefined,
-//   ".glb",
-// );
-// view.bindMeshes(importResult.meshes);
+const defaultAsset = componentConfig.assets[0];
+const blobURL = await getAssetBlobURL(defaultAsset.id, appObjects);
+const importResult = await SceneLoader.ImportMeshAsync(
+  "",
+  blobURL,
+  "",
+  scene,
+  undefined,
+  ".glb",
+);
+view.bindMeshes(importResult.meshes, importResult.transformNodes);
+
+// ─── Inspector Sliders ───────────────────────────────────────────────────────
+
+const uc = SetJointAngleUC.getById(INSTANCE_ID, appObjects);
+const entity = ABB6700Entity.getById(INSTANCE_ID, appObjects);
+
+if (uc && entity) {
+  const joints = ["j1", "j2", "j3", "j4", "j5", "j6"] as const;
+
+  for (const joint of joints) {
+    Object.defineProperty(scene, `abb6700_${joint}`, {
+      configurable: true,
+      enumerable: true,
+      get: () => entity[joint].degrees,
+      set: (deg: number) => {
+        setJointAngle(
+          INSTANCE_ID,
+          joint as ABB6700Joint,
+          Angle.FromDegrees(deg),
+          appObjects,
+        );
+      },
+    });
+  }
+
+  (scene as unknown as Record<string, unknown>).inspectableCustomProperties = [
+    {
+      label: "ABB 6700 Joints",
+      propertyName: "abb6700_joints_tab",
+      type: InspectableType.Tab,
+    },
+    {
+      label: "Joint 1",
+      propertyName: "abb6700_j1",
+      type: InspectableType.Slider,
+      min: -180,
+      max: 180,
+      step: 1,
+    },
+    {
+      label: "Joint 2",
+      propertyName: "abb6700_j2",
+      type: InspectableType.Slider,
+      min: -180,
+      max: 180,
+      step: 1,
+    },
+    {
+      label: "Joint 3",
+      propertyName: "abb6700_j3",
+      type: InspectableType.Slider,
+      min: -180,
+      max: 180,
+      step: 1,
+    },
+    {
+      label: "Joint 4",
+      propertyName: "abb6700_j4",
+      type: InspectableType.Slider,
+      min: -180,
+      max: 180,
+      step: 1,
+    },
+    {
+      label: "Joint 5",
+      propertyName: "abb6700_j5",
+      type: InspectableType.Slider,
+      min: -180,
+      max: 180,
+      step: 1,
+    },
+    {
+      label: "Joint 6",
+      propertyName: "abb6700_j6",
+      type: InspectableType.Slider,
+      min: -180,
+      max: 180,
+      step: 1,
+    },
+  ];
+}
 
 // ─── Inspector & Render Loop ─────────────────────────────────────────────────
 

@@ -6,6 +6,7 @@ import {
   makeABB6700Repo,
 } from "../Entities/ABB6700Repo";
 import { makeABB6700PM } from "../PMs/ABB6700PM";
+import { makeSetJointAngleUC } from "../UCs/SetJointAngleUC";
 
 /**
  * ABB6700FeatureFactory
@@ -32,7 +33,7 @@ export class ABB6700FeatureFactory extends DomainFactory {
   }
 
   setupUCs(): void {
-    // No UCs for this feature yet
+    // Per-instance UCs are created on-demand by the entity factory
   }
 
   setupPMs(): void {
@@ -63,6 +64,7 @@ function makeABB6700InstanceFactory(
   return function (id: string): ABB6700Entity {
     const ao = appObjects.getOrCreate(id);
     const entity = makeABB6700Entity(ao);
+    makeSetJointAngleUC(ao);
     makeABB6700PM(ao);
     return entity;
   };

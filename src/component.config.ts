@@ -12,5 +12,7 @@ export default {
   multiInstance: true,
 
   /** 3D asset files to include in the build */
-  assets: ["8a448235-bed3-4f2b-b934-848c6fad43ed"],
+  assets: [
+    { id: "8a448235-bed3-4f2b-b934-848c6fad43ed", file: "abb_6700.glb" },
+  ],
 };

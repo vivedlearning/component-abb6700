@@ -30,8 +30,19 @@ export {
   makeABB6700FeatureFactory,
 } from "./Factory/ABB6700FeatureFactory";
 
+// Use Cases
+export {
+  SetJointAngleUC,
+  makeSetJointAngleUC,
+  type ABB6700Joint,
+} from "./UCs/SetJointAngleUC";
+
+// Controllers
+export { setJointAngle } from "./Controllers/setJointAngle";
+
 // Mocks (for consumer testing)
 export { MockABB6700PM } from "./Mocks/MockABB6700PM";
+export { MockSetJointAngleUC } from "./Mocks/MockSetJointAngleUC";
 
 // Config
 export { default as componentConfig } from "./component.config";
