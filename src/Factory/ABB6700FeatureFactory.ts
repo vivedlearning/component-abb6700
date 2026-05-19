@@ -6,6 +6,7 @@ import {
   makeABB6700Repo,
 } from "../Entities/ABB6700Repo";
 import { makeABB6700PM } from "../PMs/ABB6700PM";
+import { makeABB6700RepoPM } from "../PMs/ABB6700RepoPM";
 
 /**
  * ABB6700FeatureFactory
@@ -36,7 +37,7 @@ export class ABB6700FeatureFactory extends DomainFactory {
   }
 
   setupPMs(): void {
-    // Per-instance PMs are created on-demand by the entity factory
+    makeABB6700RepoPM(this.appObject);
   }
 
   finalSetup(): void {

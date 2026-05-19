@@ -14,15 +14,26 @@ export {
 
 // Presentation Managers
 export { ABB6700PM, makeABB6700PM, type ABB6700VM } from "./PMs/ABB6700PM";
+export {
+  ABB6700RepoPM,
+  makeABB6700RepoPM,
+  type ABB6700RepoVM,
+} from "./PMs/ABB6700RepoPM";
 
 // Adapters
 export { aBB6700PMAdapter } from "./Adapters/aBB6700PMAdapter";
+export { aBB6700RepoPMAdapter } from "./Adapters/aBB6700RepoPMAdapter";
 
 // Views
 export {
   ABB6700BabylonView,
   makeABB6700BabylonView,
 } from "./Views/ABB6700BabylonView";
+export {
+  ABB6700BabylonViewFactory,
+  makeABB6700BabylonViewFactory,
+  setupABB6700Framework,
+} from "./Views/ABB6700BabylonViewFactory";
 
 // Factory
 export {

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { AppObjectRepo, makeAppObjectRepo } from "@vived/core";
 import { ABB6700Repo } from "../Entities/ABB6700Repo";
+import { ABB6700RepoPM } from "../PMs/ABB6700RepoPM";
 import {
   ABB6700FeatureFactory,
   makeABB6700FeatureFactory,
@@ -42,5 +43,14 @@ describe("ABB6700FeatureFactory", () => {
     // PM was created
     const pm = entity.appObject.getComponent("ABB6700PM");
     expect(pm).toBeDefined();
+  });
+
+  it("creates ABB6700RepoPM during setupPMs", () => {
+    const factory = makeABB6700FeatureFactory(appObjects);
+    factory.setupEntities();
+    factory.setupPMs();
+
+    const repoPM = ABB6700RepoPM.getById("ABB6700s", appObjects);
+    expect(repoPM).toBeDefined();
   });
 });
