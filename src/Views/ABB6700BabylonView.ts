@@ -1,7 +1,10 @@
+import "@babylonjs/loaders/glTF";
 import { AppObject, AppObjectView } from "@vived/core";
-import { AbstractMesh, TransformNode } from "@babylonjs/core";
+import { AbstractMesh, Scene, SceneLoader, TransformNode } from "@babylonjs/core";
+import { getAssetBlobURL } from "@vived/app";
 import { ABB6700VM } from "../PMs/ABB6700PM";
 import { aBB6700PMAdapter } from "../Adapters/aBB6700PMAdapter";
+import componentConfig from "../component.config";
 
 export type { ABB6700Joint } from "../UCs/SetJointAngleUC";
 
@@ -27,8 +30,11 @@ export abstract class ABB6700BabylonView extends AppObjectView {
    */
   async setupView(): Promise<void> {}
 
+  /** Load the robot GLB asset and bind its meshes to this view */
+  abstract load(scene: Scene): Promise<void>;
+
   /** Bind loaded meshes and transform nodes to this view for rendering */
-  abstract bindMeshes(
+  protected abstract bindMeshes(
     meshes: AbstractMesh[],
     transformNodes?: TransformNode[],
   ): void;
@@ -59,7 +65,24 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
   private stabilizerRotationNode: TransformNode | undefined;
   private stabilizerPrismaticNode: TransformNode | undefined;
 
-  bindMeshes(
+  async load(scene: Scene): Promise<void> {
+    const asset = componentConfig.assets[0];
+    if (!asset) {
+      throw new Error("ABB6700BabylonView: no assets configured in componentConfig");
+    }
+    const blobURL = await getAssetBlobURL(asset.id, this.appObjects);
+    const result = await SceneLoader.ImportMeshAsync(
+      "",
+      blobURL,
+      "",
+      scene,
+      undefined,
+      ".glb",
+    );
+    this.bindMeshes(result.meshes, result.transformNodes);
+  }
+
+  protected bindMeshes(
     meshes: AbstractMesh[],
     transformNodes: TransformNode[] = [],
   ): void {
