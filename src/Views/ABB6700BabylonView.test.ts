@@ -37,6 +37,16 @@ import {
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
+/** Access the protected `bindMeshes` method for testing */
+function callBindMeshes(
+  view: ABB6700BabylonView,
+  meshes: AbstractMesh[],
+  transformNodes?: TransformNode[],
+): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (view as any).bindMeshes(meshes, transformNodes);
+}
+
 function makeNode(
   name: string,
   opts?: { meshId?: string; hasQuaternion?: boolean },
@@ -145,7 +155,7 @@ describe("ABB6700BabylonView", () => {
       const j5 = makeMesh("joint_5");
       const j6 = makeMesh("joint_6");
 
-      view.bindMeshes([j1, j2, j3, j4, j5, j6]);
+      callBindMeshes(view, [j1, j2, j3, j4, j5, j6]);
 
       // Trigger a VM update to verify nodes are bound
       const vm = makeVM({
@@ -173,7 +183,7 @@ describe("ABB6700BabylonView", () => {
       const view = makeABB6700BabylonView(appObject);
 
       const j1 = makeMesh("some_arbitrary_name", { meshId: "Joint_1" });
-      view.bindMeshes([j1]);
+      callBindMeshes(view, [j1]);
 
       const vm = makeVM({ j1: Angle.FromDegrees(45) });
       pm.doUpdateView(vm);
@@ -190,7 +200,7 @@ describe("ABB6700BabylonView", () => {
       const stabRot = makeNode("stabilizer_joint_1");
       const stabPrismatic = makeNode("stabilizer_joint_2");
 
-      view.bindMeshes([], [stabRot, stabPrismatic]);
+      callBindMeshes(view, [], [stabRot, stabPrismatic]);
 
       const vm = makeVM({
         stabilizerAngle: Angle.FromDegrees(15),
@@ -216,7 +226,7 @@ describe("ABB6700BabylonView", () => {
 
       expect(j1.rotationQuaternion).not.toBeNull();
 
-      view.bindMeshes([j1, j2], [stabRot]);
+      callBindMeshes(view, [j1, j2], [stabRot]);
 
       expect(j1.rotationQuaternion).toBeNull();
       expect(j2.rotationQuaternion).toBeNull();
@@ -233,7 +243,7 @@ describe("ABB6700BabylonView", () => {
         hasQuaternion: true,
       });
 
-      view.bindMeshes([], [stabPrismatic]);
+      callBindMeshes(view, [], [stabPrismatic]);
 
       // stabilizerPrismaticNode is not in the jointNodes list that gets nulled
       expect(stabPrismatic.rotationQuaternion).not.toBeNull();
@@ -251,7 +261,7 @@ describe("ABB6700BabylonView", () => {
 
       // Now bind meshes — the last VM should be re-applied
       const j1 = makeMesh("joint_1");
-      view.bindMeshes([j1]);
+      callBindMeshes(view, [j1]);
 
       expect(j1.rotation.z).toBeCloseTo(Angle.FromDegrees(30).radians);
     });
@@ -263,11 +273,11 @@ describe("ABB6700BabylonView", () => {
       const view = makeABB6700BabylonView(appObject);
 
       const j1Old = makeMesh("joint_1");
-      view.bindMeshes([j1Old]);
+      callBindMeshes(view, [j1Old]);
 
       // Re-bind with a new set of meshes (no j1 this time)
       const j2 = makeMesh("joint_2");
-      view.bindMeshes([j2]);
+      callBindMeshes(view, [j2]);
 
       const vm = makeVM({
         j1: Angle.FromDegrees(45),
@@ -288,7 +298,7 @@ describe("ABB6700BabylonView", () => {
       const view = makeABB6700BabylonView(appObject);
 
       const j1 = makeMesh("JOINT_1");
-      view.bindMeshes([j1]);
+      callBindMeshes(view, [j1]);
 
       const vm = makeVM({ j1: Angle.FromDegrees(25) });
       pm.doUpdateView(vm);
@@ -313,7 +323,7 @@ describe("ABB6700BabylonView", () => {
       const stabRot = makeNode("stabilizer_joint_1");
       const stabPrismatic = makeNode("stabilizer_joint_2");
 
-      view.bindMeshes([j1, j2, j3, j4, j5, j6], [stabRot, stabPrismatic]);
+      callBindMeshes(view, [j1, j2, j3, j4, j5, j6], [stabRot, stabPrismatic]);
 
       const vm = makeVM({
         j1: Angle.FromDegrees(10),
@@ -370,7 +380,7 @@ describe("ABB6700BabylonView", () => {
       const view = makeABB6700BabylonView(appObject);
 
       const j1 = makeMesh("joint_1");
-      view.bindMeshes([j1]);
+      callBindMeshes(view, [j1]);
 
       view.dispose();
 

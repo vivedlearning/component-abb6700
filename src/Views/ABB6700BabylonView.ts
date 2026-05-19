@@ -1,6 +1,12 @@
 import "@babylonjs/loaders/glTF";
 import { AppObject, AppObjectView } from "@vived/core";
-import { AbstractMesh, Scene, SceneLoader, TransformNode } from "@babylonjs/core";
+import {
+  AbstractMesh,
+  AssetContainer,
+  Scene,
+  SceneLoader,
+  TransformNode,
+} from "@babylonjs/core";
 import { getAssetBlobURL } from "@vived/app";
 import { ABB6700VM } from "../PMs/ABB6700PM";
 import { aBB6700PMAdapter } from "../Adapters/aBB6700PMAdapter";
@@ -54,7 +60,10 @@ export function makeABB6700BabylonView(
 }
 
 class ABB6700BabylonViewImp extends ABB6700BabylonView {
+  private static containerCache = new Map<string, AssetContainer>();
+
   private lastVM: ABB6700VM | undefined;
+  private instantiatedEntries?: { dispose(): void };
 
   private j1Node: TransformNode | undefined;
   private j2Node: TransformNode | undefined;
@@ -68,18 +77,50 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
   async load(scene: Scene): Promise<void> {
     const asset = componentConfig.assets[0];
     if (!asset) {
-      throw new Error("ABB6700BabylonView: no assets configured in componentConfig");
+      throw new Error(
+        "ABB6700BabylonView: no assets configured in componentConfig",
+      );
     }
-    const blobURL = await getAssetBlobURL(asset.id, this.appObjects);
-    const result = await SceneLoader.ImportMeshAsync(
-      "",
-      blobURL,
-      "",
-      scene,
-      undefined,
-      ".glb",
+
+    // Dispose previous instance if load is called again
+    this.instantiatedEntries?.dispose();
+
+    let container = ABB6700BabylonViewImp.containerCache.get(asset.id);
+    if (!container) {
+      const blobURL = await getAssetBlobURL(asset.id, this.appObjects);
+      container = await SceneLoader.LoadAssetContainerAsync(
+        blobURL,
+        "",
+        scene,
+        undefined,
+        ".glb",
+      );
+      ABB6700BabylonViewImp.containerCache.set(asset.id, container);
+    }
+
+    const entries = container.instantiateModelsToScene((name) => name);
+    this.instantiatedEntries = entries;
+
+    const allDescendants: TransformNode[] = [];
+    for (const root of entries.rootNodes) {
+      if (root instanceof TransformNode) {
+        allDescendants.push(root);
+      }
+      for (const desc of root.getDescendants(false)) {
+        if (desc instanceof TransformNode) {
+          allDescendants.push(desc);
+        }
+      }
+    }
+
+    const meshes = allDescendants.filter(
+      (n): n is AbstractMesh => n instanceof AbstractMesh,
     );
-    this.bindMeshes(result.meshes, result.transformNodes);
+    const transformNodes = allDescendants.filter(
+      (n) => !(n instanceof AbstractMesh),
+    );
+
+    this.bindMeshes(meshes, transformNodes);
   }
 
   protected bindMeshes(
@@ -174,6 +215,7 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
   };
 
   dispose(): void {
+    this.instantiatedEntries?.dispose();
     aBB6700PMAdapter.unsubscribe(
       this.appObject.id,
       this.appObjects,
