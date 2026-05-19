@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { Angle, AppObject, makeAppObjectRepo } from "@vived/core";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { Angle, makeAppObjectRepo } from "@vived/core";
 import { ABB6700Entity, makeABB6700Entity } from "./ABB6700Entity";
 
 describe("ABB6700Entity", () => {

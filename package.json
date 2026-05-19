@@ -1,6 +1,6 @@
 {
-  "name": "@vived/component-ABB6700",
-  "version": "0.1.0",
+  "name": "@vived/component-abb-6700",
+  "version": "1.0.0",
   "description": "ABB 6700 — VIVED Smart Component",
   "private": false,
   "type": "module",
