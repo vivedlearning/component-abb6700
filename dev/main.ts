@@ -21,8 +21,10 @@ import {
   makeABB6700FeatureFactory,
   componentConfig,
   type ABB6700Joint,
+  type ABB6700Pose,
 } from "../src";
 import { setJointAngle } from "../src/Controllers/setJointAngle";
+import { setPose } from "../src/Controllers/setPose";
 import { makeDevGetAssetBlobURLUC } from "./DevGetAssetBlobURLUC";
 
 const INSTANCE_ID = "dev-aBB6700-1";
@@ -175,8 +177,76 @@ if (uc && entity) {
       max: 180,
       step: 1,
     },
+    {
+      label: "Poses",
+      propertyName: "abb6700_poses_tab",
+      type: InspectableType.Tab,
+    },
+    {
+      label: "Home",
+      propertyName: "abb6700_pose_home",
+      type: InspectableType.Button,
+      callback: () => setPose(INSTANCE_ID, POSES.home, appObjects),
+    },
+    {
+      label: "Reach Forward",
+      propertyName: "abb6700_pose_reach_forward",
+      type: InspectableType.Button,
+      callback: () => setPose(INSTANCE_ID, POSES.reachForward, appObjects),
+    },
+    {
+      label: "Reach Up",
+      propertyName: "abb6700_pose_reach_up",
+      type: InspectableType.Button,
+      callback: () => setPose(INSTANCE_ID, POSES.reachUp, appObjects),
+    },
+    {
+      label: "Low Pick",
+      propertyName: "abb6700_pose_low_pick",
+      type: InspectableType.Button,
+      callback: () => setPose(INSTANCE_ID, POSES.lowPick, appObjects),
+    },
   ];
 }
+
+// ─── Poses ───────────────────────────────────────────────────────────────────
+
+const deg = Angle.FromDegrees;
+
+const POSES: Record<string, ABB6700Pose> = {
+  home: {
+    j1: deg(0),
+    j2: deg(0),
+    j3: deg(0),
+    j4: deg(0),
+    j5: deg(0),
+    j6: deg(0),
+  },
+  reachForward: {
+    j1: deg(0),
+    j2: deg(-45),
+    j3: deg(45),
+    j4: deg(0),
+    j5: deg(30),
+    j6: deg(0),
+  },
+  reachUp: {
+    j1: deg(0),
+    j2: deg(-90),
+    j3: deg(0),
+    j4: deg(0),
+    j5: deg(0),
+    j6: deg(0),
+  },
+  lowPick: {
+    j1: deg(0),
+    j2: deg(20),
+    j3: deg(-30),
+    j4: deg(0),
+    j5: deg(80),
+    j6: deg(0),
+  },
+};
 
 // ─── Inspector & Render Loop ─────────────────────────────────────────────────
 

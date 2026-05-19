@@ -8,6 +8,7 @@ import {
 import { makeABB6700PM } from "../PMs/ABB6700PM";
 import { makeCalcStabilizerUC } from "../UCs/CalcStabilizerUC";
 import { makeSetJointAngleUC } from "../UCs/SetJointAngleUC";
+import { makeSetPoseUC } from "../UCs/SetPoseUC";
 
 /**
  * ABB6700FeatureFactory
@@ -66,6 +67,7 @@ function makeABB6700InstanceFactory(
     const ao = appObjects.getOrCreate(id);
     const entity = makeABB6700Entity(ao);
     makeSetJointAngleUC(ao);
+    makeSetPoseUC(ao);
     makeCalcStabilizerUC(ao);
     makeABB6700PM(ao);
     return entity;

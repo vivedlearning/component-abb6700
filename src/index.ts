@@ -36,13 +36,17 @@ export {
   makeSetJointAngleUC,
   type ABB6700Joint,
 } from "./UCs/SetJointAngleUC";
+export { SetPoseUC, makeSetPoseUC, type ABB6700Pose } from "./UCs/SetPoseUC";
 
 // Controllers
 export { setJointAngle } from "./Controllers/setJointAngle";
+export { setPose } from "./Controllers/setPose";
+export { getPose } from "./Controllers/getPose";
 
 // Mocks (for consumer testing)
 export { MockABB6700PM } from "./Mocks/MockABB6700PM";
 export { MockSetJointAngleUC } from "./Mocks/MockSetJointAngleUC";
+export { MockSetPoseUC } from "./Mocks/MockSetPoseUC";
 
 // Config
 export { default as componentConfig } from "./component.config";
