@@ -58,7 +58,6 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
   private j6Node: TransformNode | undefined;
   private stabilizerRotationNode: TransformNode | undefined;
   private stabilizerPrismaticNode: TransformNode | undefined;
-  private stabilizerPrismaticRestZ = 0;
 
   bindMeshes(
     meshes: AbstractMesh[],
@@ -122,11 +121,6 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
       }
     }
 
-    // Capture the prismatic joint's rest position
-    if (this.stabilizerPrismaticNode) {
-      this.stabilizerPrismaticRestZ = this.stabilizerPrismaticNode.position.z;
-    }
-
     // Apply current state to the newly bound meshes
     if (this.lastVM) {
       this.applyView(this.lastVM);
@@ -153,8 +147,7 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
     if (this.stabilizerRotationNode)
       this.stabilizerRotationNode.rotation.z = vm.stabilizerAngle.radians;
     if (this.stabilizerPrismaticNode)
-      this.stabilizerPrismaticNode.position.z =
-        this.stabilizerPrismaticRestZ + vm.stabilizerExtension;
+      this.stabilizerPrismaticNode.position.z = vm.stabilizerExtension;
   };
 
   dispose(): void {
