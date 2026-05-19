@@ -1,31 +1,18 @@
 import "@babylonjs/loaders/glTF";
 import "@babylonjs/inspector";
-import {
-  ArcRotateCamera,
-  Color4,
-  CubeTexture,
-  Engine,
-  HemisphericLight,
-  InspectableType,
-  Scene,
-  SceneLoader,
-  Vector3,
-} from "@babylonjs/core";
-import { Angle, makeAppObjectRepo, makeDomainFactoryRepo } from "@vived/core";
+import { SceneLoader } from "@babylonjs/core";
+import { makeAppObjectRepo, makeDomainFactoryRepo } from "@vived/core";
 import { getAssetBlobURL } from "@vived/app";
 import {
-  ABB6700Entity,
-  ABB6700Repo,
-  SetJointAngleUC,
-  makeABB6700BabylonView,
+  ABB6700BabylonView,
+  createABB6700,
   makeABB6700FeatureFactory,
+  setupABB6700InstanceFactory,
   componentConfig,
-  type ABB6700Joint,
-  type ABB6700Pose,
 } from "../src";
-import { setJointAngle } from "../src/Controllers/setJointAngle";
-import { setPose } from "../src/Controllers/setPose";
 import { makeDevGetAssetBlobURLUC } from "./DevGetAssetBlobURLUC";
+import { setupBabylon } from "./setupBabylon";
+import { setupInspector } from "./setupInspector";
 
 const INSTANCE_ID = "dev-aBB6700-1";
 
@@ -37,53 +24,31 @@ if (!canvas) {
   throw new Error("Missing required playground DOM elements");
 }
 
-// ─── Babylon.js Scene Setup ────────────────────────────────────────────────────
-
-const engine = new Engine(canvas, true);
-const scene = new Scene(engine);
-scene.clearColor = new Color4(0.18, 0.18, 0.2, 1);
-
-const camera = new ArcRotateCamera(
-  "camera",
-  Math.PI / 2,
-  Math.PI / 3,
-  5,
-  Vector3.Zero(),
-  scene,
-);
-camera.attachControl(canvas, true);
-camera.wheelPrecision = 50;
-
-const envTexture = CubeTexture.CreateFromPrefilteredData("/studio.env", scene);
-scene.environmentTexture = envTexture;
-
-const mainLight = new HemisphericLight(
-  "mainLight",
-  new Vector3(0, 1, 0),
-  scene,
-);
-mainLight.intensity = 0.6;
-
 // ─── Domain Setup ────────────────────────────────────────────────────────────
 
 const appObjects = makeAppObjectRepo();
 const domainFactoryRepo = makeDomainFactoryRepo(appObjects);
 makeABB6700FeatureFactory(appObjects);
 domainFactoryRepo.setupDomain();
+setupABB6700InstanceFactory(appObjects);
 
 makeDevGetAssetBlobURLUC(appObjects);
 
+// ─── Babylon.js Scene Setup ────────────────────────────────────────────────────
+
+const { engine, scene } = setupBabylon(canvas);
+
 // ─── Create Component Instance ───────────────────────────────────────────────
 
-const repo = ABB6700Repo.get(appObjects);
-if (!repo) {
-  throw new Error("Unable to initialize ABB6700Repo");
+const instanceAO = createABB6700(INSTANCE_ID, appObjects);
+if (!instanceAO) {
+  throw new Error("Unable to create ABB6700 instance");
 }
-repo.createABB6700Entity(INSTANCE_ID);
 
-const instanceAO = appObjects.getOrCreate(INSTANCE_ID);
-const view = makeABB6700BabylonView(instanceAO);
-await view.setupView();
+const view = ABB6700BabylonView.get(instanceAO);
+if (!view) {
+  throw new Error("Unable to get ABB6700BabylonView");
+}
 
 // ─── Load 3D Asset ───────────────────────────────────────────────────────────
 
@@ -101,152 +66,7 @@ view.bindMeshes(importResult.meshes, importResult.transformNodes);
 
 // ─── Inspector Sliders ───────────────────────────────────────────────────────
 
-const uc = SetJointAngleUC.getById(INSTANCE_ID, appObjects);
-const entity = ABB6700Entity.getById(INSTANCE_ID, appObjects);
-
-if (uc && entity) {
-  const joints = ["j1", "j2", "j3", "j4", "j5", "j6"] as const;
-
-  for (const joint of joints) {
-    Object.defineProperty(scene, `abb6700_${joint}`, {
-      configurable: true,
-      enumerable: true,
-      get: () => entity[joint].degrees,
-      set: (deg: number) => {
-        setJointAngle(
-          INSTANCE_ID,
-          joint as ABB6700Joint,
-          Angle.FromDegrees(deg),
-          appObjects,
-        );
-      },
-    });
-  }
-
-  (scene as unknown as Record<string, unknown>).inspectableCustomProperties = [
-    {
-      label: "ABB 6700 Joints",
-      propertyName: "abb6700_joints_tab",
-      type: InspectableType.Tab,
-    },
-    {
-      label: "Joint 1",
-      propertyName: "abb6700_j1",
-      type: InspectableType.Slider,
-      min: -180,
-      max: 180,
-      step: 1,
-    },
-    {
-      label: "Joint 2",
-      propertyName: "abb6700_j2",
-      type: InspectableType.Slider,
-      min: -180,
-      max: 180,
-      step: 1,
-    },
-    {
-      label: "Joint 3",
-      propertyName: "abb6700_j3",
-      type: InspectableType.Slider,
-      min: -180,
-      max: 180,
-      step: 1,
-    },
-    {
-      label: "Joint 4",
-      propertyName: "abb6700_j4",
-      type: InspectableType.Slider,
-      min: -180,
-      max: 180,
-      step: 1,
-    },
-    {
-      label: "Joint 5",
-      propertyName: "abb6700_j5",
-      type: InspectableType.Slider,
-      min: -180,
-      max: 180,
-      step: 1,
-    },
-    {
-      label: "Joint 6",
-      propertyName: "abb6700_j6",
-      type: InspectableType.Slider,
-      min: -180,
-      max: 180,
-      step: 1,
-    },
-    {
-      label: "Poses",
-      propertyName: "abb6700_poses_tab",
-      type: InspectableType.Tab,
-    },
-    {
-      label: "Home",
-      propertyName: "abb6700_pose_home",
-      type: InspectableType.Button,
-      callback: () => setPose(INSTANCE_ID, POSES.home, appObjects),
-    },
-    {
-      label: "Reach Forward",
-      propertyName: "abb6700_pose_reach_forward",
-      type: InspectableType.Button,
-      callback: () => setPose(INSTANCE_ID, POSES.reachForward, appObjects),
-    },
-    {
-      label: "Reach Up",
-      propertyName: "abb6700_pose_reach_up",
-      type: InspectableType.Button,
-      callback: () => setPose(INSTANCE_ID, POSES.reachUp, appObjects),
-    },
-    {
-      label: "Low Pick",
-      propertyName: "abb6700_pose_low_pick",
-      type: InspectableType.Button,
-      callback: () => setPose(INSTANCE_ID, POSES.lowPick, appObjects),
-    },
-  ];
-}
-
-// ─── Poses ───────────────────────────────────────────────────────────────────
-
-const deg = Angle.FromDegrees;
-
-const POSES: Record<string, ABB6700Pose> = {
-  home: {
-    j1: deg(0),
-    j2: deg(0),
-    j3: deg(0),
-    j4: deg(0),
-    j5: deg(0),
-    j6: deg(0),
-  },
-  reachForward: {
-    j1: deg(0),
-    j2: deg(-45),
-    j3: deg(45),
-    j4: deg(0),
-    j5: deg(30),
-    j6: deg(0),
-  },
-  reachUp: {
-    j1: deg(0),
-    j2: deg(-90),
-    j3: deg(0),
-    j4: deg(0),
-    j5: deg(0),
-    j6: deg(0),
-  },
-  lowPick: {
-    j1: deg(0),
-    j2: deg(20),
-    j3: deg(-30),
-    j4: deg(0),
-    j5: deg(80),
-    j6: deg(0),
-  },
-};
+setupInspector(INSTANCE_ID, scene, appObjects);
 
 // ─── Inspector & Render Loop ─────────────────────────────────────────────────
 

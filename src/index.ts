@@ -29,6 +29,7 @@ export {
   ABB6700FeatureFactory,
   makeABB6700FeatureFactory,
 } from "./Factory/ABB6700FeatureFactory";
+export { setupABB6700InstanceFactory } from "./setupABB6700InstanceFactory";
 
 // Use Cases
 export {
@@ -39,6 +40,7 @@ export {
 export { SetPoseUC, makeSetPoseUC, type ABB6700Pose } from "./UCs/SetPoseUC";
 
 // Controllers
+export { createABB6700 } from "./Controllers/createABB6700";
 export { setJointAngle } from "./Controllers/setJointAngle";
 export { setPose } from "./Controllers/setPose";
 export { getPose } from "./Controllers/getPose";

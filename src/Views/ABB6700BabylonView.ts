@@ -1,6 +1,7 @@
 import { AppObject, AppObjectView } from "@vived/core";
 import { AbstractMesh, TransformNode } from "@babylonjs/core";
-import { ABB6700PM, ABB6700VM } from "../PMs/ABB6700PM";
+import { ABB6700VM } from "../PMs/ABB6700PM";
+import { aBB6700PMAdapter } from "../Adapters/aBB6700PMAdapter";
 
 export type { ABB6700Joint } from "../UCs/SetJointAngleUC";
 
@@ -15,14 +16,16 @@ type MeshMetadata = {
 /**
  * ABB6700BabylonView
  *
- * Babylon.js view for the ABB 6700. Subscribes to the PM
- * and updates the 3D representation when the view model changes.
+ * Babylon.js view for the ABB 6700. Subscribes to the PM via the adapter
+ * automatically in the constructor.
  */
 export abstract class ABB6700BabylonView extends AppObjectView {
   static readonly type = "ABB6700BabylonView";
 
-  /** Set up the view by subscribing to the PM */
-  abstract setupView(): Promise<void>;
+  /**
+   * @deprecated Subscription is now handled automatically in the constructor.
+   */
+  async setupView(): Promise<void> {}
 
   /** Bind loaded meshes and transform nodes to this view for rendering */
   abstract bindMeshes(
@@ -45,7 +48,7 @@ export function makeABB6700BabylonView(
 }
 
 class ABB6700BabylonViewImp extends ABB6700BabylonView {
-  private pm: ABB6700PM | undefined;
+  private lastVM: ABB6700VM | undefined;
 
   private j1Node: TransformNode | undefined;
   private j2Node: TransformNode | undefined;
@@ -56,17 +59,6 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
   private stabilizerRotationNode: TransformNode | undefined;
   private stabilizerPrismaticNode: TransformNode | undefined;
   private stabilizerPrismaticRestZ = 0;
-
-  async setupView(): Promise<void> {
-    this.pm = this.getCachedLocalComponent<ABB6700PM>(ABB6700PM.type);
-
-    if (!this.pm) {
-      this.warn("Missing ABB6700PM for view");
-      return;
-    }
-
-    this.pm.addView(this.applyView);
-  }
 
   bindMeshes(
     meshes: AbstractMesh[],
@@ -136,8 +128,8 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
     }
 
     // Apply current state to the newly bound meshes
-    if (this.pm?.lastVM) {
-      this.applyView(this.pm.lastVM);
+    if (this.lastVM) {
+      this.applyView(this.lastVM);
     }
   }
 
@@ -151,6 +143,7 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
   }
 
   private applyView = (vm: ABB6700VM): void => {
+    this.lastVM = vm;
     if (this.j1Node) this.j1Node.rotation.z = vm.j1.radians;
     if (this.j2Node) this.j2Node.rotation.z = vm.j2.radians;
     if (this.j3Node) this.j3Node.rotation.z = vm.j3.radians;
@@ -165,13 +158,20 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
   };
 
   dispose(): void {
-    if (this.pm) {
-      this.pm.removeView(this.applyView);
-    }
+    aBB6700PMAdapter.unsubscribe(
+      this.appObject.id,
+      this.appObjects,
+      this.applyView,
+    );
     super.dispose();
   }
 
   constructor(appObject: AppObject) {
     super(appObject, ABB6700BabylonView.type);
+    aBB6700PMAdapter.subscribe(
+      this.appObject.id,
+      this.appObjects,
+      this.applyView,
+    );
   }
 }

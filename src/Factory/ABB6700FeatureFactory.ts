@@ -1,14 +1,6 @@
 import { AppObjectRepo, DomainFactory } from "@vived/core";
-import { ABB6700Entity, makeABB6700Entity } from "../Entities/ABB6700Entity";
-import {
-  ABB6700EntityFactory,
-  ABB6700Repo,
-  makeABB6700Repo,
-} from "../Entities/ABB6700Repo";
-import { makeABB6700PM } from "../PMs/ABB6700PM";
-import { makeCalcStabilizerUC } from "../UCs/CalcStabilizerUC";
-import { makeSetJointAngleUC } from "../UCs/SetJointAngleUC";
-import { makeSetPoseUC } from "../UCs/SetPoseUC";
+import { ABB6700Repo, makeABB6700Repo } from "../Entities/ABB6700Repo";
+import { setupABB6700InstanceFactory } from "../setupABB6700InstanceFactory";
 
 /**
  * ABB6700FeatureFactory
@@ -29,9 +21,7 @@ export class ABB6700FeatureFactory extends DomainFactory {
 
   setupEntities(): void {
     this.repo = makeABB6700Repo(this.appObject);
-    this.repo.aBB6700EntityFactory = makeABB6700InstanceFactory(
-      this.appObjects,
-    );
+    setupABB6700InstanceFactory(this.appObjects);
   }
 
   setupUCs(): void {
@@ -55,21 +45,4 @@ export function makeABB6700FeatureFactory(
 ): ABB6700FeatureFactory {
   const appObject = appObjects.getOrCreate("ABB6700s");
   return new ABB6700FeatureFactory(appObject);
-}
-
-/**
- * Per-instance factory that creates Entity + PM for each component instance
- */
-function makeABB6700InstanceFactory(
-  appObjects: AppObjectRepo,
-): ABB6700EntityFactory {
-  return function (id: string): ABB6700Entity {
-    const ao = appObjects.getOrCreate(id);
-    const entity = makeABB6700Entity(ao);
-    makeSetJointAngleUC(ao);
-    makeSetPoseUC(ao);
-    makeCalcStabilizerUC(ao);
-    makeABB6700PM(ao);
-    return entity;
-  };
 }
