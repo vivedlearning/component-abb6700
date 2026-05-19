@@ -75,7 +75,13 @@ class ABB6700BabylonViewFactoryImp extends ABB6700BabylonViewFactory {
 
     for (const id of vm.entityIds) {
       if (!this.viewMap.has(id)) {
-        void this.setupEntityView(id);
+        void this.setupEntityView(id).catch((error) => {
+          this.warn(
+            `Failed to setup ABB6700 view for ${id}: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        });
       }
     }
 
