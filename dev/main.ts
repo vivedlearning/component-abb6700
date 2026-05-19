@@ -1,14 +1,10 @@
-import "@babylonjs/loaders/glTF";
 import "@babylonjs/inspector";
-import { SceneLoader } from "@babylonjs/core";
 import { makeAppObjectRepo, makeDomainFactoryRepo } from "@vived/core";
-import { getAssetBlobURL } from "@vived/app";
 import {
   ABB6700BabylonView,
   createABB6700,
   makeABB6700FeatureFactory,
   setupABB6700InstanceFactory,
-  componentConfig,
 } from "../src";
 import { makeDevGetAssetBlobURLUC } from "./DevGetAssetBlobURLUC";
 import { setupBabylon } from "./setupBabylon";
@@ -52,17 +48,7 @@ if (!view) {
 
 // ─── Load 3D Asset ───────────────────────────────────────────────────────────
 
-const defaultAsset = componentConfig.assets[0];
-const blobURL = await getAssetBlobURL(defaultAsset.id, appObjects);
-const importResult = await SceneLoader.ImportMeshAsync(
-  "",
-  blobURL,
-  "",
-  scene,
-  undefined,
-  ".glb",
-);
-view.bindMeshes(importResult.meshes, importResult.transformNodes);
+await view.load(scene);
 
 // ─── Inspector Sliders ───────────────────────────────────────────────────────
 
