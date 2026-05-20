@@ -204,7 +204,7 @@ The `load()` method uses an internal `AssetContainer` cache — multiple instanc
 | Views       | `ABB6700BabylonView`, `makeABB6700BabylonView`                                                             |
 | Factory     | `ABB6700FeatureFactory`, `makeABB6700FeatureFactory`, `setupABB6700InstanceFactory`                        |
 | Controllers | `createABB6700`, `setJointAngle`, `setPose`, `getPose`                                                     |
-| Mocks       | `MockABB6700PM`, `MockSetJointAngleUC`, `MockSetPoseUC`                                                   |
+| Mocks       | `MockABB6700PM`, `MockSetJointAngleUC`, `MockSetPoseUC`                                                    |
 
 ---
 
