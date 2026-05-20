@@ -45,6 +45,12 @@ export abstract class ABB6700BabylonView extends AppObjectView {
     transformNodes?: TransformNode[],
   ): void;
 
+  /** The End-of-Arm Tooling transform node (available after load) */
+  abstract get eotTransformNode(): TransformNode | undefined;
+
+  /** The root transform node of the robot (available after load) */
+  abstract get rootTransformNode(): TransformNode | undefined;
+
   static get(appObj: AppObject): ABB6700BabylonView | undefined {
     return appObj.getComponent<ABB6700BabylonView>(this.type);
   }
@@ -73,6 +79,16 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
   private j6Node: TransformNode | undefined;
   private stabilizerRotationNode: TransformNode | undefined;
   private stabilizerPrismaticNode: TransformNode | undefined;
+  private eotNode: TransformNode | undefined;
+  private _rootNode: TransformNode | undefined;
+
+  get eotTransformNode(): TransformNode | undefined {
+    return this.eotNode;
+  }
+
+  get rootTransformNode(): TransformNode | undefined {
+    return this._rootNode;
+  }
 
   async load(scene: Scene): Promise<void> {
     const asset = componentConfig.assets[0];
@@ -100,6 +116,10 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
 
     const entries = container.instantiateModelsToScene((name) => name);
     this.instantiatedEntries = entries;
+
+    // Capture the root transform node
+    const firstRoot = entries.rootNodes[0];
+    this._rootNode = firstRoot instanceof TransformNode ? firstRoot : undefined;
 
     const allDescendants: TransformNode[] = [];
     for (const root of entries.rootNodes) {
@@ -135,6 +155,7 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
     this.j6Node = undefined;
     this.stabilizerRotationNode = undefined;
     this.stabilizerPrismaticNode = undefined;
+    this.eotNode = undefined;
 
     const allNodes: TransformNode[] = [...meshes, ...transformNodes];
 
@@ -164,6 +185,9 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
           break;
         case "stabilizer_joint_2":
           this.stabilizerPrismaticNode = node;
+          break;
+        case "eot":
+          this.eotNode = node;
           break;
       }
     }

@@ -360,6 +360,66 @@ describe("ABB6700BabylonView", () => {
     });
   });
 
+  describe("eotTransformNode", () => {
+    it("returns undefined before meshes are bound", () => {
+      const appObject = appObjects.getOrCreate("arm-1");
+      makeABB6700Entity(appObject);
+      new MockABB6700PM(appObject);
+      const view = makeABB6700BabylonView(appObject);
+
+      expect(view.eotTransformNode).toBeUndefined();
+    });
+
+    it("returns the EOT node after binding a mesh with meshId 'eot'", () => {
+      const appObject = appObjects.getOrCreate("arm-1");
+      makeABB6700Entity(appObject);
+      new MockABB6700PM(appObject);
+      const view = makeABB6700BabylonView(appObject);
+
+      const eot = makeNode("some_name", { meshId: "eot" });
+      callBindMeshes(view, [], [eot]);
+
+      expect(view.eotTransformNode).toBe(eot);
+    });
+
+    it("matches EOT node by name (case-insensitive)", () => {
+      const appObject = appObjects.getOrCreate("arm-1");
+      makeABB6700Entity(appObject);
+      new MockABB6700PM(appObject);
+      const view = makeABB6700BabylonView(appObject);
+
+      const eot = makeNode("EOT");
+      callBindMeshes(view, [], [eot]);
+
+      expect(view.eotTransformNode).toBe(eot);
+    });
+
+    it("resets EOT node when bindMeshes is called again without EOT", () => {
+      const appObject = appObjects.getOrCreate("arm-1");
+      makeABB6700Entity(appObject);
+      new MockABB6700PM(appObject);
+      const view = makeABB6700BabylonView(appObject);
+
+      const eot = makeNode("eot");
+      callBindMeshes(view, [], [eot]);
+      expect(view.eotTransformNode).toBe(eot);
+
+      callBindMeshes(view, []);
+      expect(view.eotTransformNode).toBeUndefined();
+    });
+  });
+
+  describe("rootTransformNode", () => {
+    it("returns undefined before load is called", () => {
+      const appObject = appObjects.getOrCreate("arm-1");
+      makeABB6700Entity(appObject);
+      new MockABB6700PM(appObject);
+      const view = makeABB6700BabylonView(appObject);
+
+      expect(view.rootTransformNode).toBeUndefined();
+    });
+  });
+
   describe("Disposal", () => {
     it("unsubscribes from the PM adapter on dispose", () => {
       const appObject = appObjects.getOrCreate("arm-1");

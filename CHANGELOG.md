@@ -2,6 +2,13 @@
 
 All notable changes to `@vived/component-ABB6700` will be documented in this file.
 
+## [1.1.0] — 2026-05-20
+
+### Added
+
+- **EOT TransformNode access** — `ABB6700BabylonView.eotTransformNode` exposes the End-of-Arm Tooling transform node (meshId `"eot"` in the GLB) so the Slide app can attach tooling to the robot's wrist.
+- **Root TransformNode access** — `ABB6700BabylonView.rootTransformNode` exposes the root transform node so the Slide app can position the robot in the scene and parent it within the scene hierarchy.
+
 ## [0.1.0] — 2026-05-18
 
 ### Added

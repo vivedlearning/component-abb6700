@@ -5,7 +5,8 @@
 The **ABB 6700** is a VIVED Smart Component (`@vived/component-abb-6700`) that represents a 6-DOF robot arm with rotational joints J1–J6 and a mechanically-coupled stabilizer linkage. Each joint angle is stored and managed independently, enabling precise robotic arm positioning in 3D scenes.
 
 - **Package**: `@vived/component-abb-6700`
-- **Version**: 1.0.0
+- **Version**: 1.1.0
+- **GitHub**: `vivedlearning/component-abb6700`
 - **Multi-instance**: Yes — multiple instances can coexist in a single scene.
 - **Peer dependencies**: `@babylonjs/core ^9.0.0`, `@vived/core ^2.0.0`, `@vived/app ^6.2.0`
 
@@ -191,6 +192,23 @@ await view.load(scene); // Loads GLB via VIVED asset pipeline, binds meshes
 
 The `load()` method uses an internal `AssetContainer` cache — multiple instances share the same loaded GLB data.
 
+### Accessing Transform Nodes
+
+After `load()` completes, the view exposes two key transform nodes for scene integration:
+
+```typescript
+const view = ABB6700BabylonView.get(appObject);
+
+// End-of-Arm Tooling — attach grippers, welders, etc. to the robot's wrist
+const eot: TransformNode | undefined = view.eotTransformNode;
+
+// Root transform — position/parent the robot in the scene hierarchy
+const root: TransformNode | undefined = view.rootTransformNode;
+```
+
+- **`eotTransformNode`** — The transform node identified by meshId `"eot"` (lowercase) in the GLB. Returns `undefined` before `load()` is called or if the GLB does not contain an EOT node.
+- **`rootTransformNode`** — The top-level root transform node of the instantiated model. Returns `undefined` before `load()` is called.
+
 ---
 
 ## Public API Exports
@@ -201,7 +219,7 @@ The `load()` method uses an internal `AssetContainer` cache — multiple instanc
 | Use Cases   | `SetJointAngleUC`, `makeSetJointAngleUC`, `SetPoseUC`, `makeSetPoseUC`, type `ABB6700Joint`, `ABB6700Pose` |
 | PMs         | `ABB6700PM`, `makeABB6700PM`, type `ABB6700VM`                                                             |
 | Adapters    | `aBB6700PMAdapter`                                                                                         |
-| Views       | `ABB6700BabylonView`, `makeABB6700BabylonView`                                                             |
+| Views       | `ABB6700BabylonView`, `makeABB6700BabylonView` (getters: `eotTransformNode`, `rootTransformNode`)          |
 | Factory     | `ABB6700FeatureFactory`, `makeABB6700FeatureFactory`, `setupABB6700InstanceFactory`                        |
 | Controllers | `createABB6700`, `setJointAngle`, `setPose`, `getPose`                                                     |
 | Mocks       | `MockABB6700PM`, `MockSetJointAngleUC`, `MockSetPoseUC`                                                    |
