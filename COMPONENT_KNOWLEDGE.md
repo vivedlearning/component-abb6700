@@ -2,12 +2,12 @@
 
 ## Overview
 
-The **ABB 6700** is a VIVED Smart Component (`@vived/component-ABB6700`) that represents a 6-DOF robot arm with rotational joints J1–J6. Each joint angle is stored and managed independently, enabling precise robotic arm positioning in 3D scenes.
+The **ABB 6700** is a VIVED Smart Component (`@vived/component-abb-6700`) that represents a 6-DOF robot arm with rotational joints J1–J6 and a mechanically-coupled stabilizer linkage. Each joint angle is stored and managed independently, enabling precise robotic arm positioning in 3D scenes.
 
-- **Package**: `@vived/component-ABB6700`
-- **Version**: 0.1.0
+- **Package**: `@vived/component-abb-6700`
+- **Version**: 1.0.0
 - **Multi-instance**: Yes — multiple instances can coexist in a single scene.
-- **Peer dependencies**: `@babylonjs/core ^9.0.0`, `@vived/core ^2.0.0`
+- **Peer dependencies**: `@babylonjs/core ^9.0.0`, `@vived/core ^2.0.0`, `@vived/app ^6.2.0`
 
 ---
 
@@ -16,16 +16,18 @@ The **ABB 6700** is a VIVED Smart Component (`@vived/component-ABB6700`) that re
 The component follows **VIVED Clean Architecture** with strict layer separation:
 
 ```
-Controllers (thin boundary functions — NOT exported from package)
+Controllers (thin boundary functions — exported from package)
     ↓ calls
-Entity (ABB6700Entity) ← source of truth (6 joint angles)
+Use Cases (SetJointAngleUC, SetPoseUC, CalcStabilizerUC)
+    ↓ mutates
+Entity (ABB6700Entity) ← source of truth (6 joint angles + stabilizer state)
     ↓ observed by
 Presentation Manager (ABB6700PM → emits ABB6700VM)
     ↓ consumed by
 Adapter (aBB6700PMAdapter) → View (ABB6700BabylonView)
 ```
 
-All domain layers (Entities, PMs, Adapters) are **framework-agnostic** — no React or Babylon imports. Only the View layer imports Babylon.js.
+All domain layers (Entities, UCs, PMs, Adapters) are **framework-agnostic** — no React or Babylon imports. Only the View layer imports Babylon.js. The View also imports `@vived/app` for asset loading.
 
 ---
 
@@ -40,8 +42,64 @@ interface ABB6700VM {
   j4: Angle;
   j5: Angle;
   j6: Angle;
+  stabilizerAngle: Angle;
+  stabilizerExtension: number;
 }
+
+/** Pose: all 6 joint angles */
+interface ABB6700Pose {
+  j1: Angle;
+  j2: Angle;
+  j3: Angle;
+  j4: Angle;
+  j5: Angle;
+  j6: Angle;
+}
+
+/** Joint identifier for single-joint operations */
+type ABB6700Joint = "j1" | "j2" | "j3" | "j4" | "j5" | "j6";
 ```
+
+---
+
+## Entity State
+
+The `ABB6700Entity` stores:
+
+- **j1–j6** (`Angle`) — Rotational joint angles, each independently settable.
+- **stabilizerAngle** (`Angle`) — Computed rotation of the stabilizer linkage (driven by `CalcStabilizerUC` when J2 changes).
+- **stabilizerExtension** (`number`) — Computed prismatic extension of the stabilizer (driven by `CalcStabilizerUC` when J2 changes).
+
+All angle properties use `MemoizedAngle` for change-detection efficiency.
+
+---
+
+## Use Cases
+
+### SetJointAngleUC
+
+Sets a single joint angle on an entity: `uc.setAngle(joint, angle)`.
+
+### SetPoseUC
+
+Sets all 6 joint angles atomically: `uc.setPose(pose)`.
+
+### CalcStabilizerUC
+
+Automatically observes the entity and recomputes `stabilizerAngle` and `stabilizerExtension` whenever J2 changes. Uses fixed/moving anchor geometry constants to model the physical stabilizer linkage between J1 and J2.
+
+---
+
+## Controllers
+
+Thin boundary functions exported from the package for consumer convenience:
+
+| Controller      | Signature                                     | Description                        |
+| --------------- | --------------------------------------------- | ---------------------------------- |
+| `createABB6700` | `(id, appObjects) → AppObject \| undefined`   | Create a new instance via the repo |
+| `setJointAngle` | `(id, joint, angle, appObjects) → void`       | Set a single joint angle           |
+| `setPose`       | `(id, pose, appObjects) → void`               | Set all 6 joints atomically        |
+| `getPose`       | `(id, appObjects) → ABB6700Pose \| undefined` | Read current pose from entity      |
 
 ---
 
@@ -51,7 +109,7 @@ The component uses the **DomainFactory** pattern from `@vived/core`. To register
 
 ```typescript
 import { makeAppObjectRepo, makeDomainFactoryRepo } from "@vived/core";
-import { makeABB6700FeatureFactory } from "@vived/component-ABB6700";
+import { makeABB6700FeatureFactory } from "@vived/component-abb-6700";
 
 const appObjects = makeAppObjectRepo();
 const factoryRepo = makeDomainFactoryRepo(appObjects);
@@ -63,20 +121,29 @@ makeABB6700FeatureFactory(appObjects);
 factoryRepo.setupDomain();
 ```
 
-`makeABB6700FeatureFactory` creates a **singleton ABB6700Repo** on an AppObject named `"ABB6700s"`. The repo's internal entity factory wires up **per-instance** components automatically:
+`makeABB6700FeatureFactory` creates a **singleton ABB6700Repo** on an AppObject named `"ABB6700s"` and calls `setupABB6700InstanceFactory` to register the per-instance entity factory. The factory wires up **per-instance** components automatically:
 
-- `ABB6700Entity` — state (6 joint angles)
+- `ABB6700Entity` — state (6 joint angles + stabilizer)
+- `SetJointAngleUC` — single-joint mutation
+- `SetPoseUC` — atomic pose mutation
+- `CalcStabilizerUC` — stabilizer linkage computation (observes J2)
 - `ABB6700PM` — view model projection
+- `ABB6700BabylonView` — 3D rendering
 
 ---
 
 ## Creating Instances
 
-Each instance is identified by a unique string ID. Create instances via the repo:
+Each instance is identified by a unique string ID. Create instances via the controller or directly via the repo:
 
 ```typescript
-import { ABB6700Repo } from "@vived/component-ABB6700";
+import { createABB6700 } from "@vived/component-abb-6700";
 
+// Via controller (recommended)
+const appObject = createABB6700("my-instance-1", appObjects);
+
+// Or directly via repo
+import { ABB6700Repo } from "@vived/component-abb-6700";
 const repo = ABB6700Repo.get(appObjects);
 const entity = repo.createABB6700Entity("my-instance-1");
 ```
@@ -88,7 +155,7 @@ const entity = repo.createABB6700Entity("my-instance-1");
 The **aBB6700PMAdapter** provides a framework-agnostic subscription interface for receiving `ABB6700VM` updates:
 
 ```typescript
-import { aBB6700PMAdapter } from "@vived/component-ABB6700";
+import { aBB6700PMAdapter } from "@vived/component-abb-6700";
 
 // Subscribe
 aBB6700PMAdapter.subscribe("my-instance-1", appObjects, (vm) => {
@@ -99,41 +166,56 @@ aBB6700PMAdapter.subscribe("my-instance-1", appObjects, (vm) => {
 aBB6700PMAdapter.unsubscribe("my-instance-1", appObjects, handler);
 ```
 
-The adapter's `defaultVM` contains all joints at `Angle.FromDegrees(0)`.
+The adapter's `defaultVM` contains all joints at `Angle.FromDegrees(0)`, `stabilizerAngle` at `Angle.FromDegrees(0)`, and `stabilizerExtension` at `0`.
 
 ---
 
 ## 3D View (Babylon.js)
 
-The `ABB6700BabylonView` binds to loaded GLB meshes and updates joint rotations based on VM changes.
+The `ABB6700BabylonView` loads the GLB asset and updates joint rotations + stabilizer linkage based on VM changes. The view subscribes to the PM adapter automatically in its constructor.
 
 ### Asset
 
-| Name    | Asset ID | File          |
-| ------- | -------- | ------------- |
-| default | (TBD)    | `ABB6700.glb` |
+| Name    | Asset ID                               | File           |
+| ------- | -------------------------------------- | -------------- |
+| default | `8a448235-bed3-4f2b-b934-848c6fad43ed` | `abb_6700.glb` |
 
-### View Setup
+### View Lifecycle
+
+The instance factory creates the view automatically. To load the 3D asset:
 
 ```typescript
-import { makeABB6700BabylonView } from "@vived/component-ABB6700";
-
-// Create view on the same AppObject as the entity
-const view = makeABB6700BabylonView(appObject);
-await view.setupView(); // Subscribe to PM
-view.bindMeshes(loadedMeshes); // Bind GLB meshes
+const view = ABB6700BabylonView.get(appObject);
+await view.load(scene); // Loads GLB via VIVED asset pipeline, binds meshes
 ```
+
+The `load()` method uses an internal `AssetContainer` cache — multiple instances share the same loaded GLB data.
+
+---
+
+## Public API Exports
+
+| Layer       | Exports                                                                                                    |
+| ----------- | ---------------------------------------------------------------------------------------------------------- |
+| Entities    | `ABB6700Entity`, `makeABB6700Entity`, `ABB6700Repo`, `makeABB6700Repo`, type `ABB6700EntityFactory`        |
+| Use Cases   | `SetJointAngleUC`, `makeSetJointAngleUC`, `SetPoseUC`, `makeSetPoseUC`, type `ABB6700Joint`, `ABB6700Pose` |
+| PMs         | `ABB6700PM`, `makeABB6700PM`, type `ABB6700VM`                                                             |
+| Adapters    | `aBB6700PMAdapter`                                                                                         |
+| Views       | `ABB6700BabylonView`, `makeABB6700BabylonView`                                                             |
+| Factory     | `ABB6700FeatureFactory`, `makeABB6700FeatureFactory`, `setupABB6700InstanceFactory`                        |
+| Controllers | `createABB6700`, `setJointAngle`, `setPose`, `getPose`                                                     |
+| Mocks       | `MockABB6700PM`, `MockSetJointAngleUC`, `MockSetPoseUC`                                                   |
 
 ---
 
 ## Adding to a Slide App — Integration Checklist
 
-1. **Install the package**: `npm install @vived/component-ABB6700`
+1. **Install the package**: `npm install @vived/component-abb-6700`
 2. **Register the feature factory** during domain setup (before `factoryRepo.setupDomain()`).
-3. **Create instances** with unique IDs when building a slide's scene.
-4. **Load the 3D asset** (GLB) via the VIVED asset pipeline.
-5. **Create the Babylon view** and call `bindMeshes()` with the loaded meshes.
-6. **Control joint angles** by setting `entity.j1` through `entity.j6` with `Angle.FromDegrees()`.
+3. **Create instances** via `createABB6700(id, appObjects)`.
+4. **Load the 3D asset** by calling `view.load(scene)` on the created instance's `ABB6700BabylonView`.
+5. **Control joint angles** via `setJointAngle(id, joint, angle, appObjects)` or `setPose(id, pose, appObjects)`.
+6. **Read current pose** via `getPose(id, appObjects)`.
 7. **Subscribe to VM updates** via `aBB6700PMAdapter` if custom UI is needed.
 
 ---
