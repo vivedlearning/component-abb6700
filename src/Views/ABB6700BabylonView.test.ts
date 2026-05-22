@@ -25,11 +25,34 @@ vi.mock("@babylonjs/core", () => {
     }
   }
 
-  return { TransformNode, AbstractMesh };
+  class SceneLoader {
+    static async LoadAssetContainerAsync() {
+      return {
+        instantiateModelsToScene: () => ({
+          rootNodes: [],
+          dispose: () => {},
+        }),
+      };
+    }
+  }
+
+  return { TransformNode, AbstractMesh, SceneLoader };
 });
+
+vi.mock("@babylonjs/loaders/glTF", () => ({}));
+
+// ── @vived/app mocks ──────────────────────────────────────────────────────
+vi.mock("@vived/app", () => ({
+  getAssetBlobURL: vi.fn(),
+  BabylonEntity: {
+    get: vi.fn(),
+    getOrCreate: vi.fn(),
+  },
+}));
 
 // Must import AFTER vi.mock so the mock is active
 import { AbstractMesh, TransformNode } from "@babylonjs/core";
+import { BabylonEntity } from "@vived/app";
 import {
   ABB6700BabylonView,
   makeABB6700BabylonView,
@@ -102,24 +125,40 @@ describe("ABB6700BabylonView", () => {
   });
 
   describe("Construction", () => {
-    it("creates the view and registers it on the AppObject", () => {
+    it("creates the view and registers it on the AppObject", async () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       new MockABB6700PM(appObject);
 
-      const view = makeABB6700BabylonView(appObject);
+      // Mock BabylonEntity to avoid load() attempting to resolve scene
+      const mockScene = {
+        /* minimal mock */
+      } as never;
+      vi.mocked(BabylonEntity.get).mockReturnValue({
+        scene: mockScene,
+      } as never);
+
+      const view = await makeABB6700BabylonView(appObject);
 
       expect(view).toBeDefined();
       expect(ABB6700BabylonView.get(appObject)).toBe(view);
     });
 
-    it("subscribes to the PM adapter on construction", () => {
+    it("subscribes to the PM adapter on construction", async () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       const pm = new MockABB6700PM(appObject);
       const addViewSpy = vi.spyOn(pm, "addView");
 
-      makeABB6700BabylonView(appObject);
+      // Mock BabylonEntity to avoid load() attempting to resolve scene
+      const mockScene = {
+        /* minimal mock */
+      } as never;
+      vi.mocked(BabylonEntity.get).mockReturnValue({
+        scene: mockScene,
+      } as never);
+
+      await makeABB6700BabylonView(appObject);
 
       expect(addViewSpy).toHaveBeenCalledOnce();
     });
@@ -131,22 +170,40 @@ describe("ABB6700BabylonView", () => {
       expect(ABB6700BabylonView.get(appObject)).toBeUndefined();
     });
 
-    it("returns the view when it exists", () => {
+    it("returns the view when it exists", async () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       new MockABB6700PM(appObject);
-      const view = makeABB6700BabylonView(appObject);
+
+      // Mock BabylonEntity to avoid load() attempting to resolve scene
+      const mockScene = {
+        /* minimal mock */
+      } as never;
+      vi.mocked(BabylonEntity.get).mockReturnValue({
+        scene: mockScene,
+      } as never);
+
+      const view = await makeABB6700BabylonView(appObject);
 
       expect(ABB6700BabylonView.get(appObject)).toBe(view);
     });
   });
 
   describe("bindMeshes", () => {
-    it("assigns joint nodes by name", () => {
+    it("assigns joint nodes by name", async () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       const pm = new MockABB6700PM(appObject);
-      const view = makeABB6700BabylonView(appObject);
+
+      // Mock BabylonEntity to avoid load() attempting to resolve scene
+      const mockScene = {
+        /* minimal mock */
+      } as never;
+      vi.mocked(BabylonEntity.get).mockReturnValue({
+        scene: mockScene,
+      } as never);
+
+      const view = await makeABB6700BabylonView(appObject);
 
       const j1 = makeMesh("joint_1");
       const j2 = makeMesh("joint_2");
@@ -176,11 +233,20 @@ describe("ABB6700BabylonView", () => {
       expect(j6.rotation.z).toBeCloseTo(Angle.FromDegrees(60).radians);
     });
 
-    it("assigns joint nodes by gltf metadata meshId", () => {
+    it("assigns joint nodes by gltf metadata meshId", async () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       const pm = new MockABB6700PM(appObject);
-      const view = makeABB6700BabylonView(appObject);
+
+      // Mock BabylonEntity to avoid load() attempting to resolve scene
+      const mockScene = {
+        /* minimal mock */
+      } as never;
+      vi.mocked(BabylonEntity.get).mockReturnValue({
+        scene: mockScene,
+      } as never);
+
+      const view = await makeABB6700BabylonView(appObject);
 
       const j1 = makeMesh("some_arbitrary_name", { meshId: "Joint_1" });
       callBindMeshes(view, [j1]);
@@ -191,11 +257,20 @@ describe("ABB6700BabylonView", () => {
       expect(j1.rotation.z).toBeCloseTo(Angle.FromDegrees(45).radians);
     });
 
-    it("assigns stabilizer nodes from transform nodes", () => {
+    it("assigns stabilizer nodes from transform nodes", async () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       const pm = new MockABB6700PM(appObject);
-      const view = makeABB6700BabylonView(appObject);
+
+      // Mock BabylonEntity to avoid load() attempting to resolve scene
+      const mockScene = {
+        /* minimal mock */
+      } as never;
+      vi.mocked(BabylonEntity.get).mockReturnValue({
+        scene: mockScene,
+      } as never);
+
+      const view = await makeABB6700BabylonView(appObject);
 
       const stabRot = makeNode("stabilizer_joint_1");
       const stabPrismatic = makeNode("stabilizer_joint_2");
@@ -212,11 +287,20 @@ describe("ABB6700BabylonView", () => {
       expect(stabPrismatic.position.z).toBeCloseTo(0.05);
     });
 
-    it("nulls rotationQuaternion on joint nodes", () => {
+    it("nulls rotationQuaternion on joint nodes", async () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       new MockABB6700PM(appObject);
-      const view = makeABB6700BabylonView(appObject);
+
+      // Mock BabylonEntity to avoid load() attempting to resolve scene
+      const mockScene = {
+        /* minimal mock */
+      } as never;
+      vi.mocked(BabylonEntity.get).mockReturnValue({
+        scene: mockScene,
+      } as never);
+
+      const view = await makeABB6700BabylonView(appObject);
 
       const j1 = makeMesh("joint_1", { hasQuaternion: true });
       const j2 = makeMesh("joint_2", { hasQuaternion: true });
@@ -233,11 +317,20 @@ describe("ABB6700BabylonView", () => {
       expect(stabRot.rotationQuaternion).toBeNull();
     });
 
-    it("does NOT null rotationQuaternion on the prismatic stabilizer node", () => {
+    it("does NOT null rotationQuaternion on the prismatic stabilizer node", async () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       new MockABB6700PM(appObject);
-      const view = makeABB6700BabylonView(appObject);
+
+      // Mock BabylonEntity to avoid load() attempting to resolve scene
+      const mockScene = {
+        /* minimal mock */
+      } as never;
+      vi.mocked(BabylonEntity.get).mockReturnValue({
+        scene: mockScene,
+      } as never);
+
+      const view = await makeABB6700BabylonView(appObject);
 
       const stabPrismatic = makeNode("stabilizer_joint_2", {
         hasQuaternion: true,
@@ -249,11 +342,17 @@ describe("ABB6700BabylonView", () => {
       expect(stabPrismatic.rotationQuaternion).not.toBeNull();
     });
 
-    it("re-applies the last VM when new meshes are bound", () => {
+    it("re-applies the last VM when new meshes are bound", async () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       const pm = new MockABB6700PM(appObject);
-      const view = makeABB6700BabylonView(appObject);
+      const mockScene = {
+        /* minimal mock */
+      } as never;
+      vi.mocked(BabylonEntity.get).mockReturnValue({
+        scene: mockScene,
+      } as never);
+      const view = await makeABB6700BabylonView(appObject);
 
       // First, send a VM update with no meshes bound
       const vm = makeVM({ j1: Angle.FromDegrees(30) });
@@ -266,11 +365,17 @@ describe("ABB6700BabylonView", () => {
       expect(j1.rotation.z).toBeCloseTo(Angle.FromDegrees(30).radians);
     });
 
-    it("resets node assignments when called again", () => {
+    it("resets node assignments when called again", async () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       const pm = new MockABB6700PM(appObject);
-      const view = makeABB6700BabylonView(appObject);
+      const mockScene = {
+        /* minimal mock */
+      } as never;
+      vi.mocked(BabylonEntity.get).mockReturnValue({
+        scene: mockScene,
+      } as never);
+      const view = await makeABB6700BabylonView(appObject);
 
       const j1Old = makeMesh("joint_1");
       callBindMeshes(view, [j1Old]);
@@ -291,11 +396,17 @@ describe("ABB6700BabylonView", () => {
       expect(j2.rotation.z).toBeCloseTo(Angle.FromDegrees(90).radians);
     });
 
-    it("handles case-insensitive node name matching", () => {
+    it("handles case-insensitive node name matching", async () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       const pm = new MockABB6700PM(appObject);
-      const view = makeABB6700BabylonView(appObject);
+      const mockScene = {
+        /* minimal mock */
+      } as never;
+      vi.mocked(BabylonEntity.get).mockReturnValue({
+        scene: mockScene,
+      } as never);
+      const view = await makeABB6700BabylonView(appObject);
 
       const j1 = makeMesh("JOINT_1");
       callBindMeshes(view, [j1]);
@@ -308,11 +419,17 @@ describe("ABB6700BabylonView", () => {
   });
 
   describe("applyView", () => {
-    it("applies all joint rotations from the VM", () => {
+    it("applies all joint rotations from the VM", async () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       const pm = new MockABB6700PM(appObject);
-      const view = makeABB6700BabylonView(appObject);
+      const mockScene = {
+        /* minimal mock */
+      } as never;
+      vi.mocked(BabylonEntity.get).mockReturnValue({
+        scene: mockScene,
+      } as never);
+      const view = await makeABB6700BabylonView(appObject);
 
       const j1 = makeMesh("joint_1");
       const j2 = makeMesh("joint_2");
@@ -347,11 +464,17 @@ describe("ABB6700BabylonView", () => {
       expect(stabPrismatic.position.z).toBeCloseTo(0.02);
     });
 
-    it("safely handles unbound nodes (no crash)", () => {
+    it("safely handles unbound nodes (no crash)", async () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       const pm = new MockABB6700PM(appObject);
-      makeABB6700BabylonView(appObject);
+      const mockScene = {
+        /* minimal mock */
+      } as never;
+      vi.mocked(BabylonEntity.get).mockReturnValue({
+        scene: mockScene,
+      } as never);
+      await makeABB6700BabylonView(appObject);
 
       // No meshes bound — should not throw
       expect(() => {
@@ -361,20 +484,32 @@ describe("ABB6700BabylonView", () => {
   });
 
   describe("eotTransformNode", () => {
-    it("returns undefined before meshes are bound", () => {
+    it("returns undefined before meshes are bound", async () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       new MockABB6700PM(appObject);
-      const view = makeABB6700BabylonView(appObject);
+      const mockScene = {
+        /* minimal mock */
+      } as never;
+      vi.mocked(BabylonEntity.get).mockReturnValue({
+        scene: mockScene,
+      } as never);
+      const view = await makeABB6700BabylonView(appObject);
 
       expect(view.eotTransformNode).toBeUndefined();
     });
 
-    it("returns the EOT node after binding a mesh with meshId 'eot'", () => {
+    it("returns the EOT node after binding a mesh with meshId 'eot'", async () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       new MockABB6700PM(appObject);
-      const view = makeABB6700BabylonView(appObject);
+      const mockScene = {
+        /* minimal mock */
+      } as never;
+      vi.mocked(BabylonEntity.get).mockReturnValue({
+        scene: mockScene,
+      } as never);
+      const view = await makeABB6700BabylonView(appObject);
 
       const eot = makeNode("some_name", { meshId: "eot" });
       callBindMeshes(view, [], [eot]);
@@ -382,11 +517,17 @@ describe("ABB6700BabylonView", () => {
       expect(view.eotTransformNode).toBe(eot);
     });
 
-    it("matches EOT node by name (case-insensitive)", () => {
+    it("matches EOT node by name (case-insensitive)", async () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       new MockABB6700PM(appObject);
-      const view = makeABB6700BabylonView(appObject);
+      const mockScene = {
+        /* minimal mock */
+      } as never;
+      vi.mocked(BabylonEntity.get).mockReturnValue({
+        scene: mockScene,
+      } as never);
+      const view = await makeABB6700BabylonView(appObject);
 
       const eot = makeNode("EOT");
       callBindMeshes(view, [], [eot]);
@@ -394,11 +535,17 @@ describe("ABB6700BabylonView", () => {
       expect(view.eotTransformNode).toBe(eot);
     });
 
-    it("resets EOT node when bindMeshes is called again without EOT", () => {
+    it("resets EOT node when bindMeshes is called again without EOT", async () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       new MockABB6700PM(appObject);
-      const view = makeABB6700BabylonView(appObject);
+      const mockScene = {
+        /* minimal mock */
+      } as never;
+      vi.mocked(BabylonEntity.get).mockReturnValue({
+        scene: mockScene,
+      } as never);
+      const view = await makeABB6700BabylonView(appObject);
 
       const eot = makeNode("eot");
       callBindMeshes(view, [], [eot]);
@@ -410,34 +557,52 @@ describe("ABB6700BabylonView", () => {
   });
 
   describe("rootTransformNode", () => {
-    it("returns undefined before load is called", () => {
+    it("returns undefined before load is called", async () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       new MockABB6700PM(appObject);
-      const view = makeABB6700BabylonView(appObject);
+      const mockScene = {
+        /* minimal mock */
+      } as never;
+      vi.mocked(BabylonEntity.get).mockReturnValue({
+        scene: mockScene,
+      } as never);
+      const view = await makeABB6700BabylonView(appObject);
 
       expect(view.rootTransformNode).toBeUndefined();
     });
   });
 
   describe("Disposal", () => {
-    it("unsubscribes from the PM adapter on dispose", () => {
+    it("unsubscribes from the PM adapter on dispose", async () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       const pm = new MockABB6700PM(appObject);
       const removeViewSpy = vi.spyOn(pm, "removeView");
 
-      const view = makeABB6700BabylonView(appObject);
+      const mockScene = {
+        /* minimal mock */
+      } as never;
+      vi.mocked(BabylonEntity.get).mockReturnValue({
+        scene: mockScene,
+      } as never);
+      const view = await makeABB6700BabylonView(appObject);
       view.dispose();
 
       expect(removeViewSpy).toHaveBeenCalledOnce();
     });
 
-    it("stops applying VM updates after disposal", () => {
+    it("stops applying VM updates after disposal", async () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       const pm = new MockABB6700PM(appObject);
-      const view = makeABB6700BabylonView(appObject);
+      const mockScene = {
+        /* minimal mock */
+      } as never;
+      vi.mocked(BabylonEntity.get).mockReturnValue({
+        scene: mockScene,
+      } as never);
+      const view = await makeABB6700BabylonView(appObject);
 
       const j1 = makeMesh("joint_1");
       callBindMeshes(view, [j1]);

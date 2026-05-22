@@ -1,11 +1,6 @@
 import "@babylonjs/inspector";
 import { makeAppObjectRepo, makeDomainFactoryRepo } from "@vived/core";
-import {
-  ABB6700BabylonView,
-  createABB6700,
-  makeABB6700FeatureFactory,
-  setupABB6700InstanceFactory,
-} from "../src";
+import { createBabylonABB6700, makeABB6700FeatureFactory } from "../src";
 import { makeDevGetAssetBlobURLUC } from "./DevGetAssetBlobURLUC";
 import { setupBabylon } from "./setupBabylon";
 import { setupInspector } from "./setupInspector";
@@ -26,29 +21,19 @@ const appObjects = makeAppObjectRepo();
 const domainFactoryRepo = makeDomainFactoryRepo(appObjects);
 makeABB6700FeatureFactory(appObjects);
 domainFactoryRepo.setupDomain();
-setupABB6700InstanceFactory(appObjects);
 
 makeDevGetAssetBlobURLUC(appObjects);
 
 // ─── Babylon.js Scene Setup ────────────────────────────────────────────────────
 
-const { engine, scene } = setupBabylon(canvas);
+const { engine, scene } = setupBabylon(canvas, appObjects);
 
-// ─── Create Component Instance ───────────────────────────────────────────────
+// ─── Create Component Instance with Babylon View ─────────────────────────────
 
-const instanceAO = createABB6700(INSTANCE_ID, appObjects);
+const instanceAO = await createBabylonABB6700(INSTANCE_ID, appObjects);
 if (!instanceAO) {
   throw new Error("Unable to create ABB6700 instance");
 }
-
-const view = ABB6700BabylonView.get(instanceAO);
-if (!view) {
-  throw new Error("Unable to get ABB6700BabylonView");
-}
-
-// ─── Load 3D Asset ───────────────────────────────────────────────────────────
-
-await view.load(scene);
 
 // ─── Inspector Sliders ───────────────────────────────────────────────────────
 

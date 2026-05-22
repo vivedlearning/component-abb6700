@@ -7,7 +7,7 @@ import {
   SceneLoader,
   TransformNode,
 } from "@babylonjs/core";
-import { getAssetBlobURL } from "@vived/app";
+import { BabylonEntity, getAssetBlobURL } from "@vived/app";
 import { ABB6700VM } from "../PMs/ABB6700PM";
 import { aBB6700PMAdapter } from "../Adapters/aBB6700PMAdapter";
 import componentConfig from "../component.config";
@@ -26,18 +26,14 @@ type MeshMetadata = {
  * ABB6700BabylonView
  *
  * Babylon.js view for the ABB 6700. Subscribes to the PM via the adapter
- * automatically in the constructor.
+ * automatically in the constructor. The view resolves its own scene and
+ * assets when load() is called, requiring no external scene parameter.
  */
 export abstract class ABB6700BabylonView extends AppObjectView {
   static readonly type = "ABB6700BabylonView";
 
-  /**
-   * @deprecated Subscription is now handled automatically in the constructor.
-   */
-  async setupView(): Promise<void> {}
-
-  /** Load the robot GLB asset and bind its meshes to this view */
-  abstract load(scene: Scene): Promise<void>;
+  /** Load the robot GLB asset, bind its meshes to this view, and subscribe to updates */
+  abstract load(): Promise<void>;
 
   /** Bind loaded meshes and transform nodes to this view for rendering */
   protected abstract bindMeshes(
@@ -57,12 +53,14 @@ export abstract class ABB6700BabylonView extends AppObjectView {
 }
 
 /**
- * Factory function to create a ABB6700BabylonView
+ * Factory function to create and fully load an ABB6700BabylonView
  */
-export function makeABB6700BabylonView(
+export async function makeABB6700BabylonView(
   appObject: AppObject,
-): ABB6700BabylonView {
-  return new ABB6700BabylonViewImp(appObject);
+): Promise<ABB6700BabylonView> {
+  const view = new ABB6700BabylonViewImp(appObject);
+  await view.load();
+  return view;
 }
 
 class ABB6700BabylonViewImp extends ABB6700BabylonView {
@@ -90,7 +88,15 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
     return this._rootNode;
   }
 
-  async load(scene: Scene): Promise<void> {
+  async load(): Promise<void> {
+    const babylonEntity = BabylonEntity.get(this.appObjects);
+    if (!babylonEntity?.scene) {
+      this.error("BabylonEntity not found or scene not set");
+      return;
+    }
+
+    const scene = babylonEntity.scene as Scene;
+
     const asset = componentConfig.assets[0];
     if (!asset) {
       throw new Error(

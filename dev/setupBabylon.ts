@@ -1,3 +1,4 @@
+import { AppObjectRepo } from "@vived/core";
 import {
   ArcRotateCamera,
   Color4,
@@ -7,8 +8,12 @@ import {
   Scene,
   Vector3,
 } from "@babylonjs/core";
+import { BabylonEntity } from "@vived/app";
 
-export function setupBabylon(canvas: HTMLCanvasElement): {
+export function setupBabylon(
+  canvas: HTMLCanvasElement,
+  appObjects: AppObjectRepo,
+): {
   engine: Engine;
   scene: Scene;
 } {
@@ -39,6 +44,11 @@ export function setupBabylon(canvas: HTMLCanvasElement): {
     scene,
   );
   mainLight.intensity = 0.6;
+
+  // Register the scene on BabylonEntity so components can resolve it
+  const babylonEntity = BabylonEntity.getOrCreate(appObjects);
+  babylonEntity.scene = scene;
+  babylonEntity.engine = engine;
 
   return { engine, scene };
 }

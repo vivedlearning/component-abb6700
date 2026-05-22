@@ -5,11 +5,14 @@ import { makeABB6700PM } from "./PMs/ABB6700PM";
 import { makeCalcStabilizerUC } from "./UCs/CalcStabilizerUC";
 import { makeSetJointAngleUC } from "./UCs/SetJointAngleUC";
 import { makeSetPoseUC } from "./UCs/SetPoseUC";
-import { makeABB6700BabylonView } from "./Views/ABB6700BabylonView";
 
 /**
  * Per-instance factory that creates Entity + PM for each component instance
  * and registers itself on the ABB6700Repo.
+ *
+ * Note: The Babylon view is NOT created here. It is created separately via the
+ * framework-layer entry point createBabylonABB6700() which keeps the domain
+ * factory pure and framework-agnostic.
  */
 export function setupABB6700InstanceFactory(appObjects: AppObjectRepo): void {
   const repo = ABB6700Repo.get(appObjects);
@@ -28,7 +31,6 @@ export function setupABB6700InstanceFactory(appObjects: AppObjectRepo): void {
     makeSetPoseUC(ao);
     makeCalcStabilizerUC(ao);
     makeABB6700PM(ao);
-    makeABB6700BabylonView(ao);
     return entity;
   };
 }

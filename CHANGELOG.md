@@ -2,6 +2,22 @@
 
 All notable changes to `@vived/component-ABB6700` will be documented in this file.
 
+## [1.2.0] — 2026-05-22
+
+### Added
+
+- **`createBabylonABB6700` bridge function** — New recommended entry point that creates a domain instance and loads the Babylon view in a single async call. Exported from the package root.
+
+### Changed
+
+- **`ABB6700BabylonView.load()` no longer requires a `scene` parameter** — The view now resolves the scene internally via `BabylonEntity`, simplifying the consumer API.
+- **`makeABB6700BabylonView` is now async** — Returns `Promise<ABB6700BabylonView>` and automatically calls `load()`, so consumers no longer need to load separately.
+- **Domain factory no longer creates the Babylon view** — `setupABB6700InstanceFactory` creates only domain-layer components (Entity, UCs, PM). The view is created separately via `createBabylonABB6700()`, keeping the domain factory framework-agnostic.
+
+### Removed
+
+- **Deprecated `setupView()` method** — Removed from `ABB6700BabylonView` (subscription was already handled in the constructor).
+
 ## [1.1.0] — 2026-05-20
 
 ### Added

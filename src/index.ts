@@ -24,6 +24,9 @@ export {
   makeABB6700BabylonView,
 } from "./Views/ABB6700BabylonView";
 
+// Framework bridge (recommended consumer entry point for Babylon integration)
+export { createBabylonABB6700 } from "./createBabylonABB6700";
+
 // Factory
 export {
   ABB6700FeatureFactory,
