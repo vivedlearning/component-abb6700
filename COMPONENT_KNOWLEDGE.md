@@ -5,7 +5,7 @@
 The ABB 6700 is a 6-axis industrial robot arm smart component. It provides a fully rigged 3D model with 6 degrees of freedom (joints J1–J6) and an automatically-computed stabilizer linkage. Developers can set individual joint angles or full poses through simple controller functions. Use this component when your slide app needs an articulated robot arm for industrial simulation, robotics education, or manufacturing visualization.
 
 - **Package**: `@vived/component-abb-6700`
-- **Version**: 1.2.0
+- **Version**: 1.3.0
 - **GitHub**: `vivedlearning/component-abb6700`
 
 ---
@@ -173,14 +173,16 @@ The GLB is loaded via the VIVED asset pipeline. An internal cache ensures multip
 
 ### Exposed Transform Nodes
 
-After the view is loaded, it exposes two transform nodes for scene integration:
+After the view is loaded, it exposes scene integration references:
 
-| Property            | Description                                                                |
-| ------------------- | -------------------------------------------------------------------------- |
-| `eotTransformNode`  | End-of-Arm Tooling node — attach grippers, welders, or tools to the wrist. |
-| `rootTransformNode` | Root node — position or parent the robot within your scene hierarchy.      |
+| Property            | Description                                                                      |
+| ------------------- | -------------------------------------------------------------------------------- |
+| `eotTransformNode`  | End-of-Arm Tooling node — attach grippers, welders, or tools to the wrist.       |
+| `rootTransformNode` | Root node — position or parent the robot within your scene hierarchy.            |
+| `shadowCasters`     | All robot meshes (`AbstractMesh[]`) ready for `ShadowGenerator.addShadowCaster`. |
 
-Both return `undefined` before `load()` completes.
+`eotTransformNode` and `rootTransformNode` return `undefined` before `load()` completes.
+`shadowCasters` returns an empty array before meshes are bound.
 
 ```typescript
 const view = ABB6700BabylonView.get(appObject);
@@ -297,6 +299,22 @@ gripperMesh.parent = view.eotTransformNode;
 gripperMesh.position = new Vector3(0, 0, 0.1);
 ```
 
+### Add robot meshes as shadow casters
+
+```typescript
+import {
+  createBabylonABB6700,
+  ABB6700BabylonView,
+} from "@vived/component-abb-6700";
+
+const appObject = await createBabylonABB6700("robot-1", appObjects);
+const view = ABB6700BabylonView.get(appObject);
+
+for (const mesh of view.shadowCasters) {
+  shadowGenerator.addShadowCaster(mesh);
+}
+```
+
 ---
 
 ## Constraints & Defaults
@@ -334,7 +352,7 @@ The stabilizer connecting J1 and J2 is computed automatically — developers do 
 | -------------- | --------------------------------- |
 | Package        | `@vived/component-abb-6700`       |
 | GitHub         | `vivedlearning/component-abb6700` |
-| Version        | 1.2.0                             |
+| Version        | 1.3.0                             |
 | Multi-instance | Yes                               |
 
 ### Full export list

@@ -2,6 +2,17 @@
 
 All notable changes to `@vived/component-ABB6700` will be documented in this file.
 
+## [1.3.0] — 2026-05-26
+
+### Added
+
+- **Shadow caster access** — `ABB6700BabylonView.shadowCasters` exposes all `AbstractMesh` instances so host apps can register them with a Babylon `ShadowGenerator`.
+
+### Changed
+
+- **GLB metadata property renamed** — Node resolution now reads `gltf.extras.objectId` (previously `meshId`) when matching joint nodes.
+- **Babylon loader API migrated** — Replaced deprecated `SceneLoader.LoadAssetContainerAsync(...)` with module-level `LoadAssetContainerAsync(...)` for Babylon.js v9 compatibility and better tree-shaking.
+
 ## [1.2.0] — 2026-05-22
 
 ### Added
@@ -22,7 +33,7 @@ All notable changes to `@vived/component-ABB6700` will be documented in this fil
 
 ### Added
 
-- **EOT TransformNode access** — `ABB6700BabylonView.eotTransformNode` exposes the End-of-Arm Tooling transform node (meshId `"eot"` in the GLB) so the Slide app can attach tooling to the robot's wrist.
+- **EOT TransformNode access** — `ABB6700BabylonView.eotTransformNode` exposes the End-of-Arm Tooling transform node (objectId `"eot"` in the GLB) so the Slide app can attach tooling to the robot's wrist.
 - **Root TransformNode access** — `ABB6700BabylonView.rootTransformNode` exposes the root transform node so the Slide app can position the robot in the scene and parent it within the scene hierarchy.
 
 ## [0.1.0] — 2026-05-18

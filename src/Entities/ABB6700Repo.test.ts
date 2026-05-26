@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { AppObject, AppObjectRepo, makeAppObjectRepo } from "@vived/core";
+import { AppObjectRepo, makeAppObjectRepo } from "@vived/core";
 import { makeABB6700Entity } from "./ABB6700Entity";
 import { ABB6700Repo, makeABB6700Repo } from "./ABB6700Repo";
 

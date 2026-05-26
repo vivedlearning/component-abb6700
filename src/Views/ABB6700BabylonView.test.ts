@@ -25,18 +25,16 @@ vi.mock("@babylonjs/core", () => {
     }
   }
 
-  class SceneLoader {
-    static async LoadAssetContainerAsync() {
-      return {
-        instantiateModelsToScene: () => ({
-          rootNodes: [],
-          dispose: () => {},
-        }),
-      };
-    }
+  async function LoadAssetContainerAsync() {
+    return {
+      instantiateModelsToScene: () => ({
+        rootNodes: [],
+        dispose: () => {},
+      }),
+    };
   }
 
-  return { TransformNode, AbstractMesh, SceneLoader };
+  return { TransformNode, AbstractMesh, LoadAssetContainerAsync };
 });
 
 vi.mock("@babylonjs/loaders/glTF", () => ({}));
@@ -72,11 +70,11 @@ function callBindMeshes(
 
 function makeNode(
   name: string,
-  opts?: { meshId?: string; hasQuaternion?: boolean },
+  opts?: { objectId?: string; hasQuaternion?: boolean },
 ): TransformNode {
   const node = new TransformNode(name);
-  if (opts?.meshId) {
-    node.metadata = { gltf: { extras: { meshId: opts.meshId } } };
+  if (opts?.objectId) {
+    node.metadata = { gltf: { extras: { objectId: opts.objectId } } };
   }
   if (opts?.hasQuaternion) {
     node.rotationQuaternion = { x: 0, y: 0, z: 0, w: 1 } as never;
@@ -86,14 +84,14 @@ function makeNode(
 
 function makeMesh(
   name: string,
-  opts?: { meshId?: string; hasQuaternion?: boolean },
+  opts?: { objectId?: string; hasQuaternion?: boolean },
 ): AbstractMesh {
   // vi.mock replaces AbstractMesh with a concrete class at runtime
   const mesh = new (AbstractMesh as unknown as new (n: string) => AbstractMesh)(
     name,
   );
-  if (opts?.meshId) {
-    mesh.metadata = { gltf: { extras: { meshId: opts.meshId } } };
+  if (opts?.objectId) {
+    mesh.metadata = { gltf: { extras: { objectId: opts.objectId } } };
   }
   if (opts?.hasQuaternion) {
     mesh.rotationQuaternion = { x: 0, y: 0, z: 0, w: 1 } as never;
@@ -233,7 +231,7 @@ describe("ABB6700BabylonView", () => {
       expect(j6.rotation.z).toBeCloseTo(Angle.FromDegrees(60).radians);
     });
 
-    it("assigns joint nodes by gltf metadata meshId", async () => {
+    it("assigns joint nodes by gltf metadata objectId", async () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       const pm = new MockABB6700PM(appObject);
@@ -248,7 +246,7 @@ describe("ABB6700BabylonView", () => {
 
       const view = await makeABB6700BabylonView(appObject);
 
-      const j1 = makeMesh("some_arbitrary_name", { meshId: "Joint_1" });
+      const j1 = makeMesh("some_arbitrary_name", { objectId: "Joint_1" });
       callBindMeshes(view, [j1]);
 
       const vm = makeVM({ j1: Angle.FromDegrees(45) });
@@ -499,7 +497,7 @@ describe("ABB6700BabylonView", () => {
       expect(view.eotTransformNode).toBeUndefined();
     });
 
-    it("returns the EOT node after binding a mesh with meshId 'eot'", async () => {
+    it("returns the EOT node after binding a mesh with objectId 'eot'", async () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       new MockABB6700PM(appObject);
@@ -511,7 +509,7 @@ describe("ABB6700BabylonView", () => {
       } as never);
       const view = await makeABB6700BabylonView(appObject);
 
-      const eot = makeNode("some_name", { meshId: "eot" });
+      const eot = makeNode("some_name", { objectId: "eot" });
       callBindMeshes(view, [], [eot]);
 
       expect(view.eotTransformNode).toBe(eot);
@@ -570,6 +568,63 @@ describe("ABB6700BabylonView", () => {
       const view = await makeABB6700BabylonView(appObject);
 
       expect(view.rootTransformNode).toBeUndefined();
+    });
+  });
+
+  describe("shadowCasters", () => {
+    it("returns an empty array before meshes are bound", async () => {
+      const appObject = appObjects.getOrCreate("arm-1");
+      makeABB6700Entity(appObject);
+      new MockABB6700PM(appObject);
+      const mockScene = {
+        /* minimal mock */
+      } as never;
+      vi.mocked(BabylonEntity.get).mockReturnValue({
+        scene: mockScene,
+      } as never);
+      const view = await makeABB6700BabylonView(appObject);
+
+      expect(view.shadowCasters).toEqual([]);
+    });
+
+    it("returns all bound meshes after bindMeshes", async () => {
+      const appObject = appObjects.getOrCreate("arm-1");
+      makeABB6700Entity(appObject);
+      new MockABB6700PM(appObject);
+      const mockScene = {
+        /* minimal mock */
+      } as never;
+      vi.mocked(BabylonEntity.get).mockReturnValue({
+        scene: mockScene,
+      } as never);
+      const view = await makeABB6700BabylonView(appObject);
+
+      const j1 = makeMesh("joint_1");
+      const j2 = makeMesh("joint_2");
+      callBindMeshes(view, [j1, j2]);
+
+      expect(view.shadowCasters).toEqual([j1, j2]);
+    });
+
+    it("updates when bindMeshes is called again", async () => {
+      const appObject = appObjects.getOrCreate("arm-1");
+      makeABB6700Entity(appObject);
+      new MockABB6700PM(appObject);
+      const mockScene = {
+        /* minimal mock */
+      } as never;
+      vi.mocked(BabylonEntity.get).mockReturnValue({
+        scene: mockScene,
+      } as never);
+      const view = await makeABB6700BabylonView(appObject);
+
+      const j1 = makeMesh("joint_1");
+      callBindMeshes(view, [j1]);
+      expect(view.shadowCasters).toEqual([j1]);
+
+      const j2 = makeMesh("joint_2");
+      callBindMeshes(view, [j2]);
+      expect(view.shadowCasters).toEqual([j2]);
     });
   });
 

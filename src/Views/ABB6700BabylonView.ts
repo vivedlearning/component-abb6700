@@ -3,8 +3,8 @@ import { AppObject, AppObjectView } from "@vived/core";
 import {
   AbstractMesh,
   AssetContainer,
+  LoadAssetContainerAsync,
   Scene,
-  SceneLoader,
   TransformNode,
 } from "@babylonjs/core";
 import { BabylonEntity, getAssetBlobURL } from "@vived/app";
@@ -17,7 +17,7 @@ export type { ABB6700Joint } from "../UCs/SetJointAngleUC";
 type MeshMetadata = {
   gltf?: {
     extras?: {
-      meshId?: string;
+      objectId?: string;
     };
   };
 };
@@ -46,6 +46,9 @@ export abstract class ABB6700BabylonView extends AppObjectView {
 
   /** The root transform node of the robot (available after load) */
   abstract get rootTransformNode(): TransformNode | undefined;
+
+  /** All meshes in this robot instance, for use as shadow casters */
+  abstract get shadowCasters(): AbstractMesh[];
 
   static get(appObj: AppObject): ABB6700BabylonView | undefined {
     return appObj.getComponent<ABB6700BabylonView>(this.type);
@@ -79,6 +82,7 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
   private stabilizerPrismaticNode: TransformNode | undefined;
   private eotNode: TransformNode | undefined;
   private _rootNode: TransformNode | undefined;
+  private _shadowCasters: AbstractMesh[] = [];
 
   get eotTransformNode(): TransformNode | undefined {
     return this.eotNode;
@@ -86,6 +90,10 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
 
   get rootTransformNode(): TransformNode | undefined {
     return this._rootNode;
+  }
+
+  get shadowCasters(): AbstractMesh[] {
+    return this._shadowCasters;
   }
 
   async load(): Promise<void> {
@@ -110,13 +118,9 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
     let container = ABB6700BabylonViewImp.containerCache.get(asset.id);
     if (!container) {
       const blobURL = await getAssetBlobURL(asset.id, this.appObjects);
-      container = await SceneLoader.LoadAssetContainerAsync(
-        blobURL,
-        "",
-        scene,
-        undefined,
-        ".glb",
-      );
+      container = await LoadAssetContainerAsync(blobURL, scene, {
+        pluginExtension: ".glb",
+      });
       ABB6700BabylonViewImp.containerCache.set(asset.id, container);
     }
 
@@ -153,6 +157,7 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
     meshes: AbstractMesh[],
     transformNodes: TransformNode[] = [],
   ): void {
+    this._shadowCasters = meshes;
     this.j1Node = undefined;
     this.j2Node = undefined;
     this.j3Node = undefined;
@@ -223,9 +228,9 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
 
   private resolveNodeId(node: TransformNode): string {
     const metadata = node.metadata as MeshMetadata | undefined;
-    const meshId = metadata?.gltf?.extras?.meshId;
-    if (typeof meshId === "string") {
-      return meshId.toLowerCase();
+    const objectId = metadata?.gltf?.extras?.objectId;
+    if (typeof objectId === "string") {
+      return objectId.toLowerCase();
     }
     return node.name.toLowerCase();
   }

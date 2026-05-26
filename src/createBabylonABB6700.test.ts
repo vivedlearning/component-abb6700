@@ -25,18 +25,16 @@ vi.mock("@babylonjs/core", () => {
     }
   }
 
-  class SceneLoader {
-    static async LoadAssetContainerAsync() {
-      return {
-        instantiateModelsToScene: () => ({
-          rootNodes: [],
-          dispose: () => {},
-        }),
-      };
-    }
+  async function LoadAssetContainerAsync() {
+    return {
+      instantiateModelsToScene: () => ({
+        rootNodes: [],
+        dispose: () => {},
+      }),
+    };
   }
 
-  return { TransformNode, AbstractMesh, SceneLoader };
+  return { TransformNode, AbstractMesh, LoadAssetContainerAsync };
 });
 
 vi.mock("@babylonjs/loaders/glTF", () => ({}));
