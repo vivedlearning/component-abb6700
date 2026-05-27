@@ -19,26 +19,6 @@ The ABB 6700 is a 6-axis industrial robot arm smart component. It provides a ful
 
 ---
 
-## Architecture
-
-The component follows **VIVED Clean Architecture** with strict layer separation:
-
-```
-Controllers (thin boundary functions — exported from package)
-    ↓ calls
-Use Cases (SetJointAngleUC, SetPoseUC, CalcStabilizerUC)
-    ↓ mutates
-Entity (ABB6700Entity) ← source of truth (6 joint angles + stabilizer state)
-    ↓ observed by
-Presentation Manager (ABB6700PM → emits ABB6700VM)
-    ↓ consumed by
-Adapter (aBB6700PMAdapter) → View (ABB6700BabylonView)
-```
-
-All domain layers (Entities, UCs, PMs, Adapters) are **framework-agnostic** — no Babylon.js imports. Only the View layer imports Babylon.js and `@vived/app` for asset loading.
-
----
-
 ## Quick Start
 
 ### 1. Install
@@ -346,6 +326,33 @@ The stabilizer connecting J1 and J2 is computed automatically — developers do 
 
 ---
 
+## Full Export List
+
+These are the current module paths re-exported by `src/index.ts`:
+
+| `src/index.ts` path | Exports |
+| ------------------- | ------- |
+| `./Domain/Entities/ABB6700Entity` | `ABB6700Entity`, `makeABB6700Entity` |
+| `./Domain/Entities/ABB6700Repo` | `ABB6700Repo`, `makeABB6700Repo`, `ABB6700EntityFactory` |
+| `./Domain/PMs/ABB6700PM` | `ABB6700PM`, `makeABB6700PM`, `ABB6700VM` |
+| `./Domain/Adapters/aBB6700PMAdapter` | `aBB6700PMAdapter` |
+| `./Frameworks/Babylon/ABB6700BabylonView` | `ABB6700BabylonView`, `makeABB6700BabylonView` |
+| `./Frameworks/Babylon/createBabylonABB6700` | `createBabylonABB6700` |
+| `./Domain/Factory/ABB6700FeatureFactory` | `ABB6700FeatureFactory`, `makeABB6700FeatureFactory` |
+| `./Domain/Factory/setupABB6700InstanceFactory` | `setupABB6700InstanceFactory` |
+| `./Domain/UCs/SetJointAngleUC` | `SetJointAngleUC`, `makeSetJointAngleUC`, `ABB6700Joint` |
+| `./Domain/UCs/SetPoseUC` | `SetPoseUC`, `makeSetPoseUC`, `ABB6700Pose` |
+| `./Domain/Controllers/createABB6700` | `createABB6700` |
+| `./Domain/Controllers/setJointAngle` | `setJointAngle` |
+| `./Domain/Controllers/setPose` | `setPose` |
+| `./Domain/Controllers/getPose` | `getPose` |
+| `./Domain/Mocks/MockABB6700PM` | `MockABB6700PM` |
+| `./Domain/Mocks/MockSetJointAngleUC` | `MockSetJointAngleUC` |
+| `./Domain/Mocks/MockSetPoseUC` | `MockSetPoseUC` |
+| `./component.config` | `componentConfig` |
+
+---
+
 ## Repository
 
 | Field          | Value                             |
@@ -355,22 +362,6 @@ The stabilizer connecting J1 and J2 is computed automatically — developers do 
 | Version        | 1.3.0                             |
 | Multi-instance | Yes                               |
 
-### Full export list
+---
 
-| Category    | Exports                                                                             |
-| ----------- | ----------------------------------------------------------------------------------- |
-| Bridge      | `createBabylonABB6700`                                                              |
-| Controllers | `createABB6700`, `setJointAngle`, `setPose`, `getPose`                              |
-| Types       | `ABB6700Pose`, `ABB6700Joint`, `ABB6700VM`, `ABB6700EntityFactory`                  |
-| View        | `ABB6700BabylonView`, `makeABB6700BabylonView`                                      |
-| Adapter     | `aBB6700PMAdapter`                                                                  |
-| Factory     | `ABB6700FeatureFactory`, `makeABB6700FeatureFactory`, `setupABB6700InstanceFactory` |
-| Entities    | `ABB6700Entity`, `makeABB6700Entity`, `ABB6700Repo`, `makeABB6700Repo`              |
-| Use Cases   | `SetJointAngleUC`, `makeSetJointAngleUC`, `SetPoseUC`, `makeSetPoseUC`              |
-| PMs         | `ABB6700PM`, `makeABB6700PM`                                                        |
-| Mocks       | `MockABB6700PM`, `MockSetJointAngleUC`, `MockSetPoseUC`                             |
-| Config      | `componentConfig`                                                                   |
-
-```
-
-```
+For contributor-focused folder rules and wiring details, see `COMPONENT_ARCHITECTURE.md`.

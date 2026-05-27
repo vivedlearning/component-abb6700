@@ -50,8 +50,8 @@ vi.mock("@vived/app", () => ({
 // Import after mocks
 import { BabylonEntity } from "@vived/app";
 import { createBabylonABB6700 } from "./createBabylonABB6700";
-import { makeABB6700FeatureFactory } from "./Factory/ABB6700FeatureFactory";
-import { ABB6700BabylonView } from "./Views/ABB6700BabylonView";
+import { makeABB6700FeatureFactory } from "../../Domain/Factory/ABB6700FeatureFactory";
+import { ABB6700BabylonView } from "./ABB6700BabylonView";
 
 describe("createBabylonABB6700", () => {
   let appObjects: AppObjectRepo;

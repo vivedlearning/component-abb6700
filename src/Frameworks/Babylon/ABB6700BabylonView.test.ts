@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Angle, makeAppObjectRepo } from "@vived/core";
-import { ABB6700VM } from "../PMs/ABB6700PM";
-import { makeABB6700Entity } from "../Entities/ABB6700Entity";
-import { MockABB6700PM } from "../Mocks/MockABB6700PM";
+import { ABB6700VM } from "../../Domain/PMs/ABB6700PM";
+import { makeABB6700Entity } from "../../Domain/Entities/ABB6700Entity";
+import { MockABB6700PM } from "../../Domain/Mocks/MockABB6700PM";
 
 // ── Babylon.js mocks ──────────────────────────────────────────────────────
 vi.mock("@babylonjs/core", () => {

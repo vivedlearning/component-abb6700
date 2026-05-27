@@ -6,8 +6,8 @@ import {
   type ABB6700Joint,
   type ABB6700Pose,
 } from "../src";
-import { setJointAngle } from "../src/Controllers/setJointAngle";
-import { setPose } from "../src/Controllers/setPose";
+import { setJointAngle } from "../src/Domain/Controllers/setJointAngle";
+import { setPose } from "../src/Domain/Controllers/setPose";
 
 export function setupInspector(
   instanceId: string,

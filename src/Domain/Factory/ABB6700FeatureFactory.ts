@@ -1,6 +1,6 @@
 import { AppObjectRepo, DomainFactory } from "@vived/core";
 import { ABB6700Repo, makeABB6700Repo } from "../Entities/ABB6700Repo";
-import { setupABB6700InstanceFactory } from "../setupABB6700InstanceFactory";
+import { setupABB6700InstanceFactory } from "./setupABB6700InstanceFactory";
 
 /**
  * ABB6700FeatureFactory
