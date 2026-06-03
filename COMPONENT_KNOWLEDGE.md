@@ -5,7 +5,7 @@
 The ABB 6700 is a 6-axis industrial robot arm smart component. It provides a fully rigged 3D model with 6 degrees of freedom (joints J1–J6) and an automatically-computed stabilizer linkage. Developers can set individual joint angles or full poses through simple controller functions. Use this component when your slide app needs an articulated robot arm for industrial simulation, robotics education, or manufacturing visualization.
 
 - **Package**: `@vived/component-abb-6700`
-- **Version**: 1.3.0
+- **Version**: 1.3.1
 - **GitHub**: `vivedlearning/component-abb6700`
 
 ---
@@ -167,7 +167,7 @@ interface ABB6700VM {
 
 | Asset ID                               | File           |
 | -------------------------------------- | -------------- |
-| `8a448235-bed3-4f2b-b934-848c6fad43ed` | `abb_6700.glb` |
+| `5306be7c-5786-4e20-83ee-fe82471c5651` | `abb_6700.glb` |
 
 The GLB is loaded via the VIVED asset pipeline. An internal cache ensures multiple instances share the same loaded asset data.
 
@@ -340,7 +340,7 @@ The stabilizer connecting J1 and J2 is computed automatically — developers do 
 | Problem                         | Cause                                | Solution                                                                                                  |
 | ------------------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------- |
 | Transform nodes are `undefined` | `load()` hasn't completed yet        | `await` the load call before accessing `eotTransformNode` or `rootTransformNode`                          |
-| Robot doesn't appear            | Asset not loaded or scene not set up | Verify asset ID matches `8a448235-bed3-4f2b-b934-848c6fad43ed` and the VIVED asset pipeline is configured |
+| Robot doesn't appear            | Asset not loaded or scene not set up | Verify asset ID matches `5306be7c-5786-4e20-83ee-fe82471c5651` and the VIVED asset pipeline is configured |
 | Stabilizer looks wrong          | Expected — it's automatic            | The stabilizer is driven by J2 only; do not try to set it manually                                        |
 | `ABB6700Repo not found`         | Feature factory not registered       | Call `makeABB6700FeatureFactory(appObjects)` and `factoryRepo.setupDomain()` before creating instances    |
 
@@ -352,7 +352,7 @@ The stabilizer connecting J1 and J2 is computed automatically — developers do 
 | -------------- | --------------------------------- |
 | Package        | `@vived/component-abb-6700`       |
 | GitHub         | `vivedlearning/component-abb6700` |
-| Version        | 1.3.0                             |
+| Version        | 1.3.1                             |
 | Multi-instance | Yes                               |
 
 ### Full export list

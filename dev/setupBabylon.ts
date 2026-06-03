@@ -8,7 +8,7 @@ import {
   Scene,
   Vector3,
 } from "@babylonjs/core";
-import { BabylonEntity } from "@vived/app";
+import { BabylonEntity, makeBabylonEntity } from "@vived/app";
 
 export function setupBabylon(
   canvas: HTMLCanvasElement,
@@ -46,7 +46,8 @@ export function setupBabylon(
   mainLight.intensity = 0.6;
 
   // Register the scene on BabylonEntity so components can resolve it
-  const babylonEntity = BabylonEntity.getOrCreate(appObjects);
+  const babylonAppObject = appObjects.getOrCreate("BabylonEntity");
+  const babylonEntity = makeBabylonEntity(babylonAppObject);
   babylonEntity.scene = scene;
   babylonEntity.engine = engine;
 

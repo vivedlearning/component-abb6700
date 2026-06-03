@@ -6,13 +6,13 @@ export default {
   displayName: "ABB 6700",
 
   /** Semantic version */
-  version: "1.3.0",
+  version: "1.3.1",
 
   /** Whether multiple instances can exist in a scene */
   multiInstance: true,
 
   /** 3D asset files to include in the build */
   assets: [
-    { id: "8a448235-bed3-4f2b-b934-848c6fad43ed", file: "abb_6700.glb" },
+    { id: "5306be7c-5786-4e20-83ee-fe82471c5651", file: "abb_6700.glb" },
   ],
 };

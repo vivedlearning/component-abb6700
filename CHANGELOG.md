@@ -2,6 +2,13 @@
 
 All notable changes to `@vived/component-ABB6700` will be documented in this file.
 
+## [1.3.1] — 2026-06-03
+
+### Changed
+
+- **EOAT transform orientation in GLB** — Flipped the EOAT transform rotation in the ABB 6700 model so end-of-arm tooling alignment matches expected orientation.
+- **Asset reference updated** — Component now uses asset ID `5306be7c-5786-4e20-83ee-fe82471c5651` for `abb_6700.glb`.
+
 ## [1.3.0] — 2026-05-26
 
 ### Added
