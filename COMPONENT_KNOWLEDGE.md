@@ -19,26 +19,6 @@ The ABB 6700 is a 6-axis industrial robot arm smart component. It provides a ful
 
 ---
 
-## Architecture
-
-The component follows **VIVED Clean Architecture** with strict layer separation:
-
-```
-Controllers (thin boundary functions — exported from package)
-    ↓ calls
-Use Cases (SetJointAngleUC, SetPoseUC, CalcStabilizerUC)
-    ↓ mutates
-Entity (ABB6700Entity) ← source of truth (6 joint angles + stabilizer state)
-    ↓ observed by
-Presentation Manager (ABB6700PM → emits ABB6700VM)
-    ↓ consumed by
-Adapter (aBB6700PMAdapter) → View (ABB6700BabylonView)
-```
-
-All domain layers (Entities, UCs, PMs, Adapters) are **framework-agnostic** — no Babylon.js imports. Only the View layer imports Babylon.js and `@vived/app` for asset loading.
-
----
-
 ## Quick Start
 
 ### 1. Install
@@ -73,21 +53,8 @@ factoryRepo.setupDomain();
 ```typescript
 import { createBabylonABB6700 } from "@vived/component-abb-6700";
 
-// Recommended: creates domain instance + Babylon view in one call
+// Creates domain instance + Babylon view in one call
 const appObject = await createBabylonABB6700("robot-1", appObjects);
-```
-
-Alternatively, create the domain instance and view separately:
-
-```typescript
-import {
-  createABB6700,
-  ABB6700BabylonView,
-  makeABB6700BabylonView,
-} from "@vived/component-abb-6700";
-
-const appObject = createABB6700("robot-1", appObjects);
-await makeABB6700BabylonView(appObject);
 ```
 
 ### 4. Move the robot
@@ -118,17 +85,36 @@ setPose(
 
 ## API Reference
 
-### Controllers
+### Public API (use these)
 
-These are the primary functions for interacting with the component:
+These are the functions a consumer should call. `createBabylonABB6700` is **THE** designated way to instantiate the component — it creates the full domain stack and Babylon view together.
 
-| Function               | Signature                                                                           | Description                                     |
-| ---------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------- |
-| `createBabylonABB6700` | `(id: string, appObjects: AppObjectRepo) → Promise<AppObject \| undefined>`         | Create instance with Babylon view (recommended) |
-| `createABB6700`        | `(id: string, appObjects: AppObjectRepo) → AppObject \| undefined`                  | Create domain-only instance (no view)           |
-| `setJointAngle`        | `(id: string, joint: ABB6700Joint, angle: Angle, appObjects: AppObjectRepo) → void` | Set a single joint angle                        |
-| `setPose`              | `(id: string, pose: ABB6700Pose, appObjects: AppObjectRepo) → void`                 | Set all 6 joints at once                        |
-| `getPose`              | `(id: string, appObjects: AppObjectRepo) → ABB6700Pose \| undefined`                | Read the current pose                           |
+| Function                    | Signature                                                                           | Description                                                                     |
+| --------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `createBabylonABB6700`      | `(id: string, appObjects: AppObjectRepo) → Promise<AppObject \| undefined>`         | **Primary entry point.** Create instance with full domain stack + Babylon view. |
+| `createABB6700`             | `(id: string, appObjects: AppObjectRepo) → AppObject \| undefined`                  | Create domain-only instance (no view). Use when you will attach a custom view.  |
+| `setJointAngle`             | `(id: string, joint: ABB6700Joint, angle: Angle, appObjects: AppObjectRepo) → void` | Set a single joint angle.                                                       |
+| `setPose`                   | `(id: string, pose: ABB6700Pose, appObjects: AppObjectRepo) → void`                 | Set all 6 joints at once.                                                       |
+| `getPose`                   | `(id: string, appObjects: AppObjectRepo) → ABB6700Pose \| undefined`                | Read the current pose.                                                          |
+| `makeABB6700FeatureFactory` | `(appObjects: AppObjectRepo) → ABB6700FeatureFactory`                               | Register the feature factory during domain setup.                               |
+| `aBB6700PMAdapter`          | `PmAdapter<ABB6700VM>`                                                              | Subscribe/unsubscribe to view model changes for custom UI.                      |
+
+### Accessors (read after creation)
+
+Static `.get()` helpers used to retrieve a view from an already-created instance.
+
+| Accessor                            | Returns                           | Description                                                                                       |
+| ----------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `ABB6700BabylonView.get(appObject)` | `ABB6700BabylonView \| undefined` | Retrieve the Babylon view to access `eotTransformNode`, `rootTransformNode`, and `shadowCasters`. |
+
+### Internal / Advanced (do not call directly)
+
+> **Warning:** These are exported for extensibility and testing only. They are created automatically by the composition entry point. Calling them directly without first creating the full domain stack will produce a partially-initialized object whose behavior silently does not work.
+
+| Function                                  | Description                                                                                                                         |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `makeABB6700BabylonView(appObject)`       | Creates the Babylon view only — no Entity, Use Cases, or PM. The robot will render but joints will not respond to controller calls. |
+| `setupABB6700InstanceFactory(appObjects)` | Wires instance-level factories. Called automatically during `setupDomain()`.                                                        |
 
 ### Types
 
@@ -198,13 +184,12 @@ view.rootTransformNode.position = new Vector3(2, 0, 0);
 
 ## Recipes
 
-### Animate the robot to a target pose
+### Set a target pose
 
 ```typescript
 import { Angle } from "@vived/core";
 import { setPose } from "@vived/component-abb-6700";
 
-// In your animation loop or on a timer:
 const targetPose = {
   j1: Angle.FromDegrees(90),
   j2: Angle.FromDegrees(-30),
@@ -217,18 +202,26 @@ const targetPose = {
 setPose("robot-1", targetPose, appObjects);
 ```
 
-### Read the current pose
+### Mount the robot in a host scene
 
 ```typescript
-import { getPose } from "@vived/component-abb-6700";
+import {
+  createBabylonABB6700,
+  ABB6700BabylonView,
+} from "@vived/component-abb-6700";
+import { Vector3 } from "@babylonjs/core";
 
-const pose = getPose("robot-1", appObjects);
-if (pose) {
-  console.log("J1:", pose.j1.degrees, "J2:", pose.j2.degrees);
-}
+const appObject = await createBabylonABB6700("robot-1", appObjects);
+const view = ABB6700BabylonView.get(appObject);
+
+// Parent the robot's root to a scene node (e.g. a workstation platform)
+view.rootTransformNode.parent = workstationNode;
+
+// Offset within the parent
+view.rootTransformNode.position = new Vector3(0, 0.5, 0);
 ```
 
-### Subscribe to joint angle changes (custom UI)
+### Subscribe to joint angle changes
 
 ```typescript
 import { aBB6700PMAdapter } from "@vived/component-abb-6700";
@@ -241,42 +234,6 @@ aBB6700PMAdapter.subscribe("robot-1", appObjects, handler);
 
 // Later, to clean up:
 aBB6700PMAdapter.unsubscribe("robot-1", appObjects, handler);
-```
-
-### Create multiple robots in a scene
-
-```typescript
-import {
-  createBabylonABB6700,
-  ABB6700BabylonView,
-} from "@vived/component-abb-6700";
-import { Vector3 } from "@babylonjs/core";
-
-for (let i = 0; i < 3; i++) {
-  const ao = await createBabylonABB6700(`robot-${i}`, appObjects);
-  const view = ABB6700BabylonView.get(ao);
-  view.rootTransformNode.position = new Vector3(i * 3, 0, 0);
-}
-```
-
-### Reset to home position
-
-```typescript
-import { Angle } from "@vived/core";
-import { setPose } from "@vived/component-abb-6700";
-
-setPose(
-  "robot-1",
-  {
-    j1: Angle.FromDegrees(0),
-    j2: Angle.FromDegrees(0),
-    j3: Angle.FromDegrees(0),
-    j4: Angle.FromDegrees(0),
-    j5: Angle.FromDegrees(0),
-    j6: Angle.FromDegrees(0),
-  },
-  appObjects,
-);
 ```
 
 ### Attach tooling to the end-of-arm
@@ -317,13 +274,58 @@ for (const mesh of view.shadowCasters) {
 
 ---
 
+## Common Mistakes
+
+### ❌ Calling `makeABB6700BabylonView` directly instead of `createBabylonABB6700`
+
+```typescript
+// ❌ WRONG — creates only the view, no domain stack
+const appObject = appObjects.getOrCreate("robot-1");
+await makeABB6700BabylonView(appObject);
+// The robot renders but setJointAngle / setPose silently do nothing
+```
+
+```typescript
+// ✅ CORRECT — creates the full domain stack + view
+const appObject = await createBabylonABB6700("robot-1", appObjects);
+```
+
+### ❌ Guessing AppObject IDs to grab an existing instance
+
+```typescript
+// ❌ WRONG — constructing an ID to find a pre-existing AppObject
+const ao = appObjects.get("robot-1");
+const view = ABB6700BabylonView.get(ao);
+// If the component wasn't created through the entry point, the domain stack is missing
+```
+
+```typescript
+// ✅ CORRECT — always create through the entry point, then use the returned AppObject
+const ao = await createBabylonABB6700("robot-1", appObjects);
+const view = ABB6700BabylonView.get(ao);
+```
+
+### ❌ Accessing view internals instead of using the `.get()` accessor
+
+```typescript
+// ❌ WRONG — reaching into internals
+const view = appObject.getComponent("ABB6700BabylonView");
+```
+
+```typescript
+// ✅ CORRECT — use the static accessor
+const view = ABB6700BabylonView.get(appObject);
+```
+
+---
+
 ## Constraints & Defaults
 
 ### Default state
 
 All joints initialize to `0` degrees. The stabilizer angle and extension are computed automatically from J2 and also start at `0`.
 
-### Stabilizer linkage
+### Automatic behaviors
 
 The stabilizer connecting J1 and J2 is computed automatically — developers do not need to set it. When J2 changes, the stabilizer angle and prismatic extension update to match the physical linkage geometry.
 
@@ -332,17 +334,6 @@ The stabilizer connecting J1 and J2 is computed automatically — developers do 
 - Joint angle limits are not currently enforced by the component. Any angle value is accepted.
 - The stabilizer computation is driven only by J2; other joints do not affect it.
 - The EOT node ID in the GLB must be `"eot"` (lowercase) for the view to detect it. If missing, `eotTransformNode` returns `undefined`.
-
----
-
-## Troubleshooting
-
-| Problem                         | Cause                                | Solution                                                                                                  |
-| ------------------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| Transform nodes are `undefined` | `load()` hasn't completed yet        | `await` the load call before accessing `eotTransformNode` or `rootTransformNode`                          |
-| Robot doesn't appear            | Asset not loaded or scene not set up | Verify asset ID matches `5306be7c-5786-4e20-83ee-fe82471c5651` and the VIVED asset pipeline is configured |
-| Stabilizer looks wrong          | Expected — it's automatic            | The stabilizer is driven by J2 only; do not try to set it manually                                        |
-| `ABB6700Repo not found`         | Feature factory not registered       | Call `makeABB6700FeatureFactory(appObjects)` and `factoryRepo.setupDomain()` before creating instances    |
 
 ---
 
@@ -357,20 +348,30 @@ The stabilizer connecting J1 and J2 is computed automatically — developers do 
 
 ### Full export list
 
-| Category    | Exports                                                                             |
-| ----------- | ----------------------------------------------------------------------------------- |
-| Bridge      | `createBabylonABB6700`                                                              |
-| Controllers | `createABB6700`, `setJointAngle`, `setPose`, `getPose`                              |
-| Types       | `ABB6700Pose`, `ABB6700Joint`, `ABB6700VM`, `ABB6700EntityFactory`                  |
-| View        | `ABB6700BabylonView`, `makeABB6700BabylonView`                                      |
-| Adapter     | `aBB6700PMAdapter`                                                                  |
-| Factory     | `ABB6700FeatureFactory`, `makeABB6700FeatureFactory`, `setupABB6700InstanceFactory` |
-| Entities    | `ABB6700Entity`, `makeABB6700Entity`, `ABB6700Repo`, `makeABB6700Repo`              |
-| Use Cases   | `SetJointAngleUC`, `makeSetJointAngleUC`, `SetPoseUC`, `makeSetPoseUC`              |
-| PMs         | `ABB6700PM`, `makeABB6700PM`                                                        |
-| Mocks       | `MockABB6700PM`, `MockSetJointAngleUC`, `MockSetPoseUC`                             |
-| Config      | `componentConfig`                                                                   |
+#### Public API (use these)
 
-```
+| Category    | Exports                                                |
+| ----------- | ------------------------------------------------------ |
+| Entry point | `createBabylonABB6700`                                 |
+| Controllers | `createABB6700`, `setJointAngle`, `setPose`, `getPose` |
+| Adapter     | `aBB6700PMAdapter`                                     |
+| Factory     | `makeABB6700FeatureFactory`                            |
 
-```
+#### Accessors (read after creation)
+
+| Category | Exports                                                            |
+| -------- | ------------------------------------------------------------------ |
+| View     | `ABB6700BabylonView` (`.get()`)                                    |
+| Types    | `ABB6700Pose`, `ABB6700Joint`, `ABB6700VM`, `ABB6700EntityFactory` |
+
+#### Internal / Advanced (extensibility/testing only — not for normal use)
+
+| Category     | Exports                                                                |
+| ------------ | ---------------------------------------------------------------------- |
+| View factory | `makeABB6700BabylonView`                                               |
+| Factory      | `ABB6700FeatureFactory`, `setupABB6700InstanceFactory`                 |
+| Entities     | `ABB6700Entity`, `makeABB6700Entity`, `ABB6700Repo`, `makeABB6700Repo` |
+| Use Cases    | `SetJointAngleUC`, `makeSetJointAngleUC`, `SetPoseUC`, `makeSetPoseUC` |
+| PMs          | `ABB6700PM`, `makeABB6700PM`                                           |
+| Mocks        | `MockABB6700PM`, `MockSetJointAngleUC`, `MockSetPoseUC`                |
+| Config       | `componentConfig`                                                      |
