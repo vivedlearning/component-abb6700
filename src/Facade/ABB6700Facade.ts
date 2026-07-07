@@ -27,7 +27,7 @@ export type ABB6700State = {
   j6: number;
 };
 
-export type ABB6700Events = {};
+export type ABB6700Events = Record<never, never>;
 
 const defaultState = (): ABB6700State => ({
   version: ABB_6700_STATE_VERSION,
