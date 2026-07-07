@@ -52,6 +52,7 @@ vi.mock("@vived/app", () => ({
 import { AbstractMesh, TransformNode } from "@babylonjs/core";
 import { BabylonEntity } from "@vived/app";
 import {
+  ABB6700_WHOLE_ARM_HIGHLIGHT_GROUP,
   ABB6700BabylonView,
   makeABB6700BabylonView,
 } from "./ABB6700BabylonView";
@@ -625,6 +626,75 @@ describe("ABB6700BabylonView", () => {
       const j2 = makeMesh("joint_2");
       callBindMeshes(view, [j2]);
       expect(view.shadowCasters).toEqual([j2]);
+    });
+  });
+
+  describe("host integration lookups", () => {
+    it("keeps highlight groups empty until visible meshes are bound", async () => {
+      const appObject = appObjects.getOrCreate("arm-1");
+      makeABB6700Entity(appObject);
+      new MockABB6700PM(appObject);
+      const mockScene = {
+        /* minimal mock */
+      } as never;
+      vi.mocked(BabylonEntity.get).mockReturnValue({
+        scene: mockScene,
+      } as never);
+      const view = await makeABB6700BabylonView(appObject);
+
+      expect(view.highlightGroupsByObjectId.size).toBe(0);
+
+      const j1 = makeMesh("joint_1");
+      const j2 = makeMesh("joint_2");
+      callBindMeshes(view, [j1, j2]);
+
+      expect([...view.highlightGroupsByObjectId.keys()]).toEqual([
+        ABB6700_WHOLE_ARM_HIGHLIGHT_GROUP,
+      ]);
+      expect(
+        view.highlightGroupsByObjectId.get(ABB6700_WHOLE_ARM_HIGHLIGHT_GROUP),
+      ).toEqual([j1, j2]);
+    });
+
+    it("populates nodesByObjectId for named parts when meshes are bound", async () => {
+      const appObject = appObjects.getOrCreate("arm-1");
+      makeABB6700Entity(appObject);
+      new MockABB6700PM(appObject);
+      const mockScene = {
+        /* minimal mock */
+      } as never;
+      vi.mocked(BabylonEntity.get).mockReturnValue({
+        scene: mockScene,
+      } as never);
+      const view = await makeABB6700BabylonView(appObject);
+
+      const j1 = makeMesh("joint_1");
+      const j2 = makeMesh("joint_2");
+      const j3 = makeMesh("joint_3");
+      const j4 = makeMesh("joint_4");
+      const j5 = makeMesh("joint_5");
+      const j6 = makeMesh("joint_6");
+      const stabRot = makeNode("stabilizer_joint_1");
+      const stabPrismatic = makeNode("stabilizer_joint_2");
+      const eot = makeNode("eot");
+
+      callBindMeshes(view, [j1, j2, j3, j4, j5, j6], [
+        stabRot,
+        stabPrismatic,
+        eot,
+      ]);
+
+      expect(view.nodesByObjectId.get("joint_1")).toBe(j1);
+      expect(view.nodesByObjectId.get("joint_2")).toBe(j2);
+      expect(view.nodesByObjectId.get("joint_3")).toBe(j3);
+      expect(view.nodesByObjectId.get("joint_4")).toBe(j4);
+      expect(view.nodesByObjectId.get("joint_5")).toBe(j5);
+      expect(view.nodesByObjectId.get("joint_6")).toBe(j6);
+      expect(view.nodesByObjectId.get("stabilizer_joint_1")).toBe(stabRot);
+      expect(view.nodesByObjectId.get("stabilizer_joint_2")).toBe(
+        stabPrismatic,
+      );
+      expect(view.nodesByObjectId.get("eot")).toBe(eot);
     });
   });
 
