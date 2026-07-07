@@ -2,6 +2,18 @@
 
 All notable changes to `@vived/component-ABB6700` will be documented in this file.
 
+## [1.4.0] — 2026-07-07
+
+### Added
+
+- **`ABB6700Facade` Smart Component seam** — Added a headless facade with the standard `SmartComponent` contract plus existing pose/joint commands for host integration.
+- **Host-side highlight lookup support** — `ABB6700BabylonView` now exposes `nodesByObjectId` and `highlightGroupsByObjectId`, including the whole-arm highlight group key `ABB6700_WHOLE_ARM_HIGHLIGHT_GROUP`.
+
+### Changed
+
+- **Declaration output verified for facade consumers** — The package build now emits declarations for the newly exported facade and host-lookup types under `dist/`.
+- **Documentation updated for presentation-free integration** — Documented the facade-first integration pattern and the host-owned highlight/pointer contract.
+
 ## [1.3.1] — 2026-06-03
 
 ### Changed
