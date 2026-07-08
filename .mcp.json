@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "vivian": {
+      "type": "http",
+      "url": "https://vivian.vivedlearning.com/mcp"
+    },
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/"
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__vivian__list_knowledge",
+      "mcp__vivian__search_knowledge",
+      "mcp__vivian__ask_vivian"
+    ]
+  },
+  "enabledMcpjsonServers": [
+    "vivian",
+    "github"
+  ]
+}

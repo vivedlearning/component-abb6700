@@ -1,0 +1,39 @@
+# Ergonomic wrapper so you don't retype long `docker run` flags.
+# All commands below assume you're in the repo's `ralph/` directory.
+services:
+  ralph:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: vived-ralph:latest
+    working_dir: /workspace
+    # stdin/tty so the one-time `claude` login is interactive.
+    stdin_open: true
+    tty: true
+    volumes:
+      # The whole repo — commits the loop makes land in your real local repo.
+      - ../:/workspace
+      # node_modules on a fast Linux-native volume instead of the slow Windows
+      # bind mount. This is the big perf fix: vitest's transform/collect reads
+      # thousands of dependency files, and over the bind mount that turned a
+      # ~1s test file into ~7min. The volume shadows the host's node_modules
+      # (which keeps its Windows binaries untouched) with Linux-native ones.
+      # Populated on first run by the scripts (npm ci); see README.
+      - node_modules:/workspace/node_modules
+      # Persisted Team-account login. Survives across runs and `down`s.
+      - claude-auth:/home/node/.claude
+    environment:
+      # Model split: strong model drives the loop, cheap model does the grind.
+      # Aliases (sonnet/haiku/opus) survive version bumps; full IDs also work.
+      RALPH_MODEL: ${RALPH_MODEL:-opus}               # loop body ("main")
+      RALPH_SUBAGENT_MODEL: ${RALPH_SUBAGENT_MODEL:-haiku}  # delegated implementer
+      # Commit identity used by the loop. Override in a .env file next to this
+      # compose file, or export before running, to attribute commits to you.
+      GIT_AUTHOR_NAME: ${GIT_AUTHOR_NAME:-Amos Patrick}
+      GIT_AUTHOR_EMAIL: ${GIT_AUTHOR_EMAIL:-amos.patrick@vivedlearning.com}
+      GIT_COMMITTER_NAME: ${GIT_AUTHOR_NAME:-Amos Patrick}
+      GIT_COMMITTER_EMAIL: ${GIT_AUTHOR_EMAIL:-amos.patrick@vivedlearning.com}
+
+volumes:
+  claude-auth:
+  node_modules:
