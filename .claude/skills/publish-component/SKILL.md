@@ -41,7 +41,8 @@ Run all of these checks upfront. Abort with a clear message on any failure.
    missing, add it before releasing. Verify with `npm pack --dry-run`: the tarball must
    contain only `dist/`, `README.md`, `LICENSE`, `COMPONENT_KNOWLEDGE.md`,
    `CHANGELOG.md`, and `package.json` — nothing contributor-facing (`docs/`, `ralph/`,
-   `.github/`, `src/`).
+   `.github/`, `src/`). See the Vivian doc
+   `knowledge/smart-component-packaging-and-distribution-convention.md`.
 
 ---
 
