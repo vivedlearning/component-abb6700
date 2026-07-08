@@ -1,8 +1,5 @@
 import { AppObject } from "@vived/core";
-import {
-  ABB6700PM,
-  ABB6700VM,
-} from "../PMs/ABB6700PM";
+import { ABB6700PM } from "../PMs/ABB6700PM";
 
 /**
  * Mock PM for testing views and adapters in isolation.

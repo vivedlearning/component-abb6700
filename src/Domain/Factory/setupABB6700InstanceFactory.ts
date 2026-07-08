@@ -1,10 +1,10 @@
 import { AppObjectRepo } from "@vived/core";
-import { ABB6700Entity, makeABB6700Entity } from "./Entities/ABB6700Entity";
-import { ABB6700Repo } from "./Entities/ABB6700Repo";
-import { makeABB6700PM } from "./PMs/ABB6700PM";
-import { makeCalcStabilizerUC } from "./UCs/CalcStabilizerUC";
-import { makeSetJointAngleUC } from "./UCs/SetJointAngleUC";
-import { makeSetPoseUC } from "./UCs/SetPoseUC";
+import { ABB6700Entity, makeABB6700Entity } from "../Entities/ABB6700Entity";
+import { ABB6700Repo } from "../Entities/ABB6700Repo";
+import { makeABB6700PM } from "../PMs/ABB6700PM";
+import { makeCalcStabilizerUC } from "../UCs/CalcStabilizerUC";
+import { makeSetJointAngleUC } from "../UCs/SetJointAngleUC";
+import { makeSetPoseUC } from "../UCs/SetPoseUC";
 
 /**
  * Per-instance factory that creates Entity + PM for each component instance

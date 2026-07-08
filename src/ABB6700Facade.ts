@@ -1,18 +1,14 @@
 import { Angle, AppObjectRepo } from "@vived/core";
-import { aBB6700PMAdapter } from "../Adapters/aBB6700PMAdapter";
-import { createABB6700 } from "../Controllers/createABB6700";
-import { getPose } from "../Controllers/getPose";
-import { setJointAngle } from "../Controllers/setJointAngle";
-import { setPose } from "../Controllers/setPose";
-import { ABB6700Entity } from "../Entities/ABB6700Entity";
-import type { ABB6700VM } from "../PMs/ABB6700PM";
-import type { ABB6700Joint } from "../UCs/SetJointAngleUC";
-import type { ABB6700Pose } from "../UCs/SetPoseUC";
-import {
-  ABB6700BabylonView,
-  makeABB6700BabylonView,
-} from "../Views/ABB6700BabylonView";
-import { ABB6700Repo } from "../Entities/ABB6700Repo";
+import { aBB6700PMAdapter } from "./Domain/Adapters/aBB6700PMAdapter";
+import { createABB6700 } from "./Domain/Controllers/createABB6700";
+import { getPose } from "./Domain/Controllers/getPose";
+import { setJointAngle } from "./Domain/Controllers/setJointAngle";
+import { setPose } from "./Domain/Controllers/setPose";
+import { ABB6700Entity } from "./Domain/Entities/ABB6700Entity";
+import type { ABB6700VM } from "./Domain/PMs/ABB6700PM";
+import type { ABB6700Joint } from "./Domain/UCs/SetJointAngleUC";
+import type { ABB6700Pose } from "./Domain/UCs/SetPoseUC";
+import { ABB6700Repo } from "./Domain/Entities/ABB6700Repo";
 import type { SmartComponent } from "./SmartComponent";
 import {
   ABB_6700_STATE_VERSION,
@@ -51,6 +47,13 @@ export class ABB6700Facade implements SmartComponent {
 
     const appObject = this.ensureAppObject();
     if (!appObject) return;
+
+    // Dynamically import the Babylon view so the facade module carries no
+    // Babylon dependency until load() is called. This keeps construction (and
+    // module import) fully headless — see ADR-0002 (two-phase lifecycle).
+    const { ABB6700BabylonView, makeABB6700BabylonView } = await import(
+      "./Frameworks/Babylon/ABB6700BabylonView"
+    );
 
     const existingView = ABB6700BabylonView.get(appObject);
     if (existingView) {

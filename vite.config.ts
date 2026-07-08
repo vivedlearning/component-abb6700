@@ -10,13 +10,9 @@ export default defineConfig({
       fileName: () => "index.js",
     },
     rollupOptions: {
-      external: [
-        "@vived/core",
-        "@vived/app",
-        "@babylonjs/core",
-        "react",
-        "react-dom",
-      ],
+      // Externalize all @vived/* and @babylonjs/* packages (including subpath
+      // imports such as "@babylonjs/loaders/glTF") so peers are not bundled.
+      external: [/^@vived\//, /^@babylonjs\//, "react", "react-dom"],
     },
   },
   test: {

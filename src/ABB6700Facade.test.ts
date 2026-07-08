@@ -52,9 +52,9 @@ vi.mock("@vived/app", () => ({
 }));
 
 import { BabylonEntity } from "@vived/app";
-import { makeABB6700FeatureFactory } from "../Factory/ABB6700FeatureFactory";
-import { ABB6700Entity } from "../Entities/ABB6700Entity";
-import { ABB6700BabylonView } from "../Views/ABB6700BabylonView";
+import { makeABB6700FeatureFactory } from "./Domain/Factory/ABB6700FeatureFactory";
+import { ABB6700Entity } from "./Domain/Entities/ABB6700Entity";
+import { ABB6700BabylonView } from "./Frameworks/Babylon/ABB6700BabylonView";
 import {
   ABB6700Facade,
   ABB_6700_STATE_VERSION,

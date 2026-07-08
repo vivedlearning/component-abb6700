@@ -9,11 +9,11 @@ import {
   type Node,
 } from "@babylonjs/core";
 import { BabylonEntity, getAssetBlobURL } from "@vived/app";
-import { ABB6700VM } from "../PMs/ABB6700PM";
-import { aBB6700PMAdapter } from "../Adapters/aBB6700PMAdapter";
-import componentConfig from "../component.config";
+import { ABB6700VM } from "../../Domain/PMs/ABB6700PM";
+import { aBB6700PMAdapter } from "../../Domain/Adapters/aBB6700PMAdapter";
+import componentConfig from "../../component.config";
 
-export type { ABB6700Joint } from "../UCs/SetJointAngleUC";
+export type { ABB6700Joint } from "../../Domain/UCs/SetJointAngleUC";
 
 export const ABB6700_WHOLE_ARM_HIGHLIGHT_GROUP = "abb_6700";
 

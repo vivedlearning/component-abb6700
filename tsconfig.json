@@ -12,6 +12,6 @@
     "esModuleInterop": true,
     "types": ["vitest/globals", "node"]
   },
-  "include": ["src", "scripts"],
-  "exclude": ["src/**/*.test.ts"]
+  "include": ["src", "scripts", "docs/prd"],
+  "exclude": ["**/*.test.ts"]
 }
