@@ -2,17 +2,20 @@
 
 All notable changes to `@vived/component-ABB6700` will be documented in this file.
 
-## [1.4.0] — 2026-07-07
+## [1.4.0] — 2026-07-08
 
 ### Added
 
-- **`ABB6700Facade` Smart Component seam** — Added a headless facade with the standard `SmartComponent` contract plus existing pose/joint commands for host integration.
-- **Host-side highlight lookup support** — `ABB6700BabylonView` now exposes `nodesByObjectId` and `highlightGroupsByObjectId`, including the whole-arm highlight group key `ABB6700_WHOLE_ARM_HIGHLIGHT_GROUP`.
+- **`ABB6700Facade` Smart Component seam** — Headless facade implementing the `SmartComponent` contract (`id`, `interfaceVersion`, `onEvent`, `onViewModel`, `load`, `destroy`, `getState`, `applyState`) plus the existing `setPose` / `setJointAngle` / `getPose` commands. This is the recommended host-integration surface: construction is headless (domain only) and `load()` attaches the Babylon view.
+- **Serializable facade state** — `getState()` / `applyState()` with the `ABB6700State` type (six joint angles in degrees) and `ABB_6700_STATE_VERSION`. `applyState` is version-checked and rejects unsupported versions.
+- **Host-side highlight lookups** — `ABB6700BabylonView` now exposes `nodesByObjectId` and `highlightGroupsByObjectId`, plus the exported whole-arm highlight group key `ABB6700_WHOLE_ARM_HIGHLIGHT_GROUP` (`"abb_6700"`).
+- **Presentation-free contract** — A guard test keeps pointer detection and interaction-state rendering out of `src/`; hosts own all picking and highlighting.
 
 ### Changed
 
-- **Declaration output verified for facade consumers** — The package build now emits declarations for the newly exported facade and host-lookup types under `dist/`.
-- **Documentation updated for presentation-free integration** — Documented the facade-first integration pattern and the host-owned highlight/pointer contract.
+- **`@babylonjs/loaders` is now a peer dependency.** Babylon core, Babylon loaders, and `@vived/app` are externalized from the library bundle instead of being bundled into it, shrinking `dist/` from ~4.7 MB to ~20 KB. When upgrading, ensure `@babylonjs/loaders` (^9.0.0) is installed alongside the existing `@babylonjs/core` peer.
+- **Facade loads the Babylon view lazily** — the view is brought in via a dynamic `import()` inside `load()`, so importing or constructing the facade pulls in no Babylon code (fully headless two-phase lifecycle).
+- **Repository restructured** — source reorganized into `src/Domain/` and `src/Frameworks/Babylon/`, with added VIVED documentation and process scaffolding (`CONTEXT.md`, ADRs, PRD + spec test, contributor architecture doc). No public API change from the restructure.
 
 ## [1.3.1] — 2026-06-03
 

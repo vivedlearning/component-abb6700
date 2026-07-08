@@ -13,6 +13,7 @@ npm install @vived/component-abb-6700
 Peer dependencies:
 
 - `@babylonjs/core ^9.0.0`
+- `@babylonjs/loaders ^9.0.0`
 - `@vived/app ^6.2.0`
 - `@vived/core ^2.0.0`
 

@@ -6,6 +6,7 @@ The ABB 6700 is a 6-axis industrial robot arm smart component. It provides a ful
 
 - **Package**: `@vived/component-abb-6700`
 - **Version**: 1.4.0
+- **Interface version**: 1 (`SmartComponent` contract implemented by `ABB6700Facade`)
 - **GitHub**: `vivedlearning/component-abb6700`
 
 ---
@@ -30,6 +31,7 @@ npm install @vived/component-abb-6700
 **Peer dependencies** (must already be in your project):
 
 - `@babylonjs/core ^9.0.0`
+- `@babylonjs/loaders ^9.0.0`
 - `@vived/core ^2.0.0`
 - `@vived/app ^6.2.0`
 
@@ -91,6 +93,60 @@ setPose(
   appObjects,
 );
 ```
+
+---
+
+## Facade (host-facing surface)
+
+`ABB6700Facade` is the canonical way a host drives an instance. It implements the structural **SmartComponent contract (v1)** and adds the ABB 6700's typed commands. Construct it synchronously, then `await load()` to attach the 3D view.
+
+> The controllers and `createBabylonABB6700` remain supported public API (the facade is additive), but the facade is the recommended surface for host integration.
+
+### Structural contract (v1)
+
+Every facade has these eight members with this exact shape:
+
+| Member             | Signature                                                       | Notes                                                                                          |
+| ------------------ | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `id`               | `readonly string`                                              | The instance identifier.                                                                       |
+| `interfaceVersion` | `readonly number`                                             | `1`.                                                                                            |
+| `onEvent`          | `(event: string, cb: (...args: never[]) => void) => () => void` | Subscribe to a named event; returns an unsubscribe fn. The ABB 6700 emits **no events** — this is a contract-complete no-op. |
+| `onViewModel`      | `(cb: (vm: ABB6700VM) => void) => () => void`                  | Subscribe to the reactive view model; returns an unsubscribe fn.                                |
+| `load`             | `(variant?: string) => Promise<void>`                         | Attaches the Babylon view. The only async member.                                              |
+| `destroy`          | `() => void`                                                  | Tears down the instance and releases resources.                                                |
+| `getState`         | `() => ABB6700State`                                          | Snapshot the authored configuration.                                                           |
+| `applyState`       | `(state: ABB6700State) => void`                              | Restore a snapshot (version-checked).                                                           |
+
+### Lifecycle (two-phase)
+
+1. **Construction** (sync) — `new ABB6700Facade(id, appObjects)` wires the full domain idempotently (constructing for an existing `id` returns a handle to the existing instance, never a duplicate). No Babylon context is required, and importing or constructing the facade pulls in no Babylon code.
+2. **Load** (async) — `await facade.load()` attaches the Babylon view. All commands, `getState`, and `applyState` work *before* `load()` is called.
+
+### Command methods
+
+| Method          | Signature                                          | Description                        |
+| --------------- | -------------------------------------------------- | ---------------------------------- |
+| `setPose`       | `(pose: ABB6700Pose) => void`                      | Set all six joints atomically.     |
+| `setJointAngle` | `(joint: ABB6700Joint, angle: Angle) => void`      | Set a single joint.                |
+| `getPose`       | `() => ABB6700Pose \| undefined`                   | Read the current pose.             |
+
+Commands return `void` — none can be blocked by a domain rule. To read state, use `getPose()`, `getState()`, or `onViewModel`.
+
+### Events
+
+The ABB 6700 emits no events. `onEvent` exists only to satisfy the contract and always returns a valid no-op unsubscribe function. Drive UI from `onViewModel` / `getState` instead.
+
+### Reactive view model (`ABB6700VM`)
+
+`onViewModel(cb)` emits the current VM immediately, then on every change, and returns an unsubscribe function. Fields: `j1`–`j6` (`Angle`), `stabilizerAngle` (`Angle`), `stabilizerExtension` (`number`). The VM is the live render picture — distinct from the saved `ABB6700State`.
+
+### State snapshot (`ABB6700State`)
+
+`getState()` / `applyState()` capture the authored configuration: `version` plus the six joint angles **in degrees**. The state schema `version` starts at `1` (`ABB_6700_STATE_VERSION`). `applyState` is **version-checked** — a snapshot whose `version` does not match the current schema version is rejected (a warning is submitted) rather than applied. Derived stabilizer state is not stored; it is recomputed from J2 on apply.
+
+### Variants & objectId interaction map
+
+`load(variant?)` accepts an optional variant string; an omitted or unrecognized variant loads the default asset. Any GLB honoring the objectId interaction map can serve as a variant. The map: `joint_1`–`joint_6` (revolute joints), `stabilizer_joint_1` (stabilizer rotation), `stabilizer_joint_2` (stabilizer prismatic extension), `eot` (end-of-arm tooling mount).
 
 ---
 
@@ -234,6 +290,20 @@ const targetPose = {
 setPose("robot-1", targetPose, appObjects);
 ```
 
+### Persist and restore authored state (facade)
+
+```typescript
+import { ABB6700Facade } from "@vived/component-abb-6700";
+
+const robot = new ABB6700Facade("robot-1", appObjects);
+
+// Snapshot the authored configuration (version + six joint angles, in degrees)
+const saved = robot.getState();
+
+// ...later, or in a fresh session after re-creating the facade...
+robot.applyState(saved); // safe to call before load()
+```
+
 ### Mount the robot in a host scene
 
 ```typescript
@@ -374,10 +444,12 @@ The stabilizer connecting J1 and J2 is computed automatically — developers do 
 
 | Field          | Value                             |
 | -------------- | --------------------------------- |
-| Package        | `@vived/component-abb-6700`       |
-| GitHub         | `vivedlearning/component-abb6700` |
-| Version        | 1.4.0                             |
-| Multi-instance | Yes                               |
+| Package              | `@vived/component-abb-6700`       |
+| GitHub               | `vivedlearning/component-abb6700` |
+| Version              | 1.4.0                             |
+| Interface version    | 1                                 |
+| State schema version | 1 (`ABB6700State.version`)        |
+| Multi-instance       | Yes                               |
 
 ### Full export list
 
