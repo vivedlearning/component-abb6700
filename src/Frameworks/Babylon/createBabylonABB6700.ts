@@ -1,6 +1,6 @@
 import { AppObject, AppObjectRepo } from "@vived/core";
-import { ABB6700Repo } from "./Entities/ABB6700Repo";
-import { makeABB6700BabylonView } from "./Views/ABB6700BabylonView";
+import { ABB6700Repo } from "../../Domain/Entities/ABB6700Repo";
+import { makeABB6700BabylonView } from "./ABB6700BabylonView";
 
 /**
  * Framework-layer entry point for creating a fully wired ABB6700 instance

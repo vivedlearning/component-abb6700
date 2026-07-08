@@ -5,11 +5,11 @@ import {
   makeAppObjectRepo,
   makeDomainFactoryRepo,
 } from "@vived/core";
-import { makeABB6700FeatureFactory } from "./Factory/ABB6700FeatureFactory";
-import { createABB6700 } from "./Controllers/createABB6700";
-import { aBB6700PMAdapter } from "./Adapters/aBB6700PMAdapter";
-import { ABB6700Entity } from "./Entities/ABB6700Entity";
-import type { ABB6700VM } from "./PMs/ABB6700PM";
+import { makeABB6700FeatureFactory } from "./Domain/Factory/ABB6700FeatureFactory";
+import { createABB6700 } from "./Domain/Controllers/createABB6700";
+import { aBB6700PMAdapter } from "./Domain/Adapters/aBB6700PMAdapter";
+import { ABB6700Entity } from "./Domain/Entities/ABB6700Entity";
+import type { ABB6700VM } from "./Domain/PMs/ABB6700PM";
 
 describe("ABB 6700 integration", () => {
   let appObjects: AppObjectRepo;

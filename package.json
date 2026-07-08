@@ -13,6 +13,7 @@
     }
   },
   "scripts": {
+    "prepublishOnly": "npm run build",
     "build": "vite build && tsc --project tsconfig.build.json --emitDeclarationOnly",
     "dev": "vite --config vite.playground.config.ts",
     "dev:watch": "vite build --watch",
@@ -24,6 +25,7 @@
   },
   "peerDependencies": {
     "@babylonjs/core": "^9.0.0",
+    "@babylonjs/loaders": "^9.0.0",
     "@vived/app": "^6.2.0",
     "@vived/core": "^2.0.0"
   },
