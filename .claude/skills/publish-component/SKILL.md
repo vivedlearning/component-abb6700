@@ -32,6 +32,16 @@ Run all of these checks upfront. Abort with a clear message on any failure.
    releasing — do not proceed.
 6. **Tests**: run `npm test`. Abort on any failure; show the failing output.
 7. **Build**: run `npm run build`. Abort on any failure; show the failing output.
+8. **Packaging convention** (standard for every VIVED smart component): `package.json`
+   must have `"license": "UNLICENSED"` and a `files` allowlist that includes `dist`,
+   `COMPONENT_KNOWLEDGE.md`, and `CHANGELOG.md`; a `LICENSE` file must exist at the
+   repo root. This ships the **version-accurate** knowledge + changelog docs alongside
+   the code (so a consumer pinned to an old version reads docs that match it, not
+   Vivian's always-latest copy) and marks the package proprietary. If any piece is
+   missing, add it before releasing. Verify with `npm pack --dry-run`: the tarball must
+   contain only `dist/`, `README.md`, `LICENSE`, `COMPONENT_KNOWLEDGE.md`,
+   `CHANGELOG.md`, and `package.json` — nothing contributor-facing (`docs/`, `ralph/`,
+   `.github/`, `src/`).
 
 ---
 
@@ -130,7 +140,7 @@ Present a release summary before any irreversible action:
 | Tag | `v<new-version>` |
 | Branch | `main` |
 | npm dist-tag | `latest` |
-| Files to publish | contents of `dist/` (per `files` field in package.json) |
+| Files to publish | `dist/`, `README.md`, `LICENSE`, `COMPONENT_KNOWLEDGE.md`, `CHANGELOG.md` (per `files` allowlist) |
 
 **Wait for explicit confirmation.** After this point the tag and publish are live.
 
@@ -154,6 +164,21 @@ npm publish
 # 4. Verify the publish landed
 npm view @vived/component-abb-6700 version
 ```
+
+> **Release mechanics — known gotchas:**
+> - **Version already ahead of the last tag.** If `package.json`'s version was bumped in
+>   a prior PR but never published (it's *ahead* of the latest git tag / npm version), do
+>   NOT run `npm version <type>` — it overshoots, or errors on same-version. Publish the
+>   current version directly: `git tag v<version>` on the docs commit, push it, then
+>   `npm publish`.
+> - **Lightweight tags don't push with `--follow-tags`.** That flag only pushes
+>   *annotated* tags. A `git tag v<x>` is lightweight — push it explicitly with
+>   `git push origin v<version>`.
+> - **npm 2FA / OTP timing.** The `prepublishOnly` build runs before npm prompts for the
+>   OTP, which often expires the ~30s code, and relaying a code through an assistant is
+>   unreliable. Best: the user runs `npm publish` in their own terminal and enters a
+>   fresh OTP when prompted. Alternative: pre-build (`npm run build`), then
+>   `npm publish --ignore-scripts --otp=<fresh code>` so the code is used immediately.
 
 **5. Push the reconciled knowledge to Vivian — only after the publish above is confirmed live.**
 This is last because it is an external, hard-to-reverse side effect: Vivian should describe
