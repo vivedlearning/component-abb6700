@@ -5,7 +5,7 @@
 The ABB 6700 is a 6-axis industrial robot arm smart component. It provides a fully rigged 3D model with 6 degrees of freedom (joints J1–J6) and an automatically-computed stabilizer linkage. Developers can set individual joint angles or full poses through simple controller functions. Use this component when your slide app needs an articulated robot arm for industrial simulation, robotics education, or manufacturing visualization.
 
 - **Package**: `@vived/component-abb-6700`
-- **Version**: 1.3.1
+- **Version**: 1.4.0
 - **GitHub**: `vivedlearning/component-abb6700`
 
 ---
@@ -48,7 +48,18 @@ makeABB6700FeatureFactory(appObjects);
 factoryRepo.setupDomain();
 ```
 
-### 3. Create an instance and load the 3D model
+### 3. Create an instance through the facade (recommended)
+
+```typescript
+import { ABB6700Facade } from "@vived/component-abb-6700";
+
+const robot = new ABB6700Facade("robot-1", appObjects);
+await robot.load();
+```
+
+`ABB6700Facade` is the recommended Host integration surface. Its constructor is headless (domain only); `load()` attaches the Babylon view.
+
+### 4. Create an instance and load the 3D model directly
 
 ```typescript
 import { createBabylonABB6700 } from "@vived/component-abb-6700";
@@ -57,7 +68,7 @@ import { createBabylonABB6700 } from "@vived/component-abb-6700";
 const appObject = await createBabylonABB6700("robot-1", appObjects);
 ```
 
-### 4. Move the robot
+### 5. Move the robot
 
 ```typescript
 import { Angle } from "@vived/core";
@@ -87,10 +98,11 @@ setPose(
 
 ### Public API (use these)
 
-These are the functions a consumer should call. `createBabylonABB6700` is **THE** designated way to instantiate the component — it creates the full domain stack and Babylon view together.
+For Host integration, prefer `ABB6700Facade`. `createBabylonABB6700` remains the convenience entry point when you want a fully-wired `AppObject` plus Babylon view in one call.
 
 | Function                    | Signature                                                                           | Description                                                                     |
 | --------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `ABB6700Facade`             | `new (id: string, appObjects: AppObjectRepo)`                                       | **Recommended Host seam.** Headless constructor; `load()` attaches Babylon.    |
 | `createBabylonABB6700`      | `(id: string, appObjects: AppObjectRepo) → Promise<AppObject \| undefined>`         | **Primary entry point.** Create instance with full domain stack + Babylon view. |
 | `createABB6700`             | `(id: string, appObjects: AppObjectRepo) → AppObject \| undefined`                  | Create domain-only instance (no view). Use when you will attach a custom view.  |
 | `setJointAngle`             | `(id: string, joint: ABB6700Joint, angle: Angle, appObjects: AppObjectRepo) → void` | Set a single joint angle.                                                       |
@@ -105,7 +117,7 @@ Static `.get()` helpers used to retrieve a view from an already-created instance
 
 | Accessor                            | Returns                           | Description                                                                                       |
 | ----------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `ABB6700BabylonView.get(appObject)` | `ABB6700BabylonView \| undefined` | Retrieve the Babylon view to access `eotTransformNode`, `rootTransformNode`, and `shadowCasters`. |
+| `ABB6700BabylonView.get(appObject)` | `ABB6700BabylonView \| undefined` | Retrieve the Babylon view to access `eotTransformNode`, `rootTransformNode`, `shadowCasters`, `nodesByObjectId`, and `highlightGroupsByObjectId`. |
 
 ### Internal / Advanced (do not call directly)
 
@@ -131,6 +143,17 @@ interface ABB6700Pose {
 
 /** Joint identifier */
 type ABB6700Joint = "j1" | "j2" | "j3" | "j4" | "j5" | "j6";
+
+/** Serializable facade state */
+type ABB6700State = {
+  version: number;
+  j1: number;
+  j2: number;
+  j3: number;
+  j4: number;
+  j5: number;
+  j6: number;
+};
 
 /** View model emitted by the PM adapter */
 interface ABB6700VM {
@@ -169,6 +192,15 @@ After the view is loaded, it exposes scene integration references:
 
 `eotTransformNode` and `rootTransformNode` return `undefined` before `load()` completes.
 `shadowCasters` returns an empty array before meshes are bound.
+
+### Host-side highlight integration
+
+`ABB6700BabylonView` is presentation-free: it does not render hover/select/hint state and does not perform pointer detection. Instead it exposes the semantic data a Host needs:
+
+- `ABB6700_WHOLE_ARM_HIGHLIGHT_GROUP = "abb_6700"` — maps to all visible robot meshes in `highlightGroupsByObjectId`
+- `nodesByObjectId` — resolved nodes for `joint_1` through `joint_6`, `stabilizer_joint_1`, `stabilizer_joint_2`, and `eot`
+
+The Host should own any `SelectionOutlineLayer`, highlighting, or picking logic.
 
 ```typescript
 const view = ABB6700BabylonView.get(appObject);
@@ -334,6 +366,7 @@ The stabilizer connecting J1 and J2 is computed automatically — developers do 
 - Joint angle limits are not currently enforced by the component. Any angle value is accepted.
 - The stabilizer computation is driven only by J2; other joints do not affect it.
 - The EOT node ID in the GLB must be `"eot"` (lowercase) for the view to detect it. If missing, `eotTransformNode` returns `undefined`.
+- The component intentionally owns no pointer detection or highlight rendering; Hosts should use `highlightGroupsByObjectId` and `nodesByObjectId` instead.
 
 ---
 
@@ -343,7 +376,7 @@ The stabilizer connecting J1 and J2 is computed automatically — developers do 
 | -------------- | --------------------------------- |
 | Package        | `@vived/component-abb-6700`       |
 | GitHub         | `vivedlearning/component-abb6700` |
-| Version        | 1.3.1                             |
+| Version        | 1.4.0                             |
 | Multi-instance | Yes                               |
 
 ### Full export list
@@ -352,7 +385,7 @@ The stabilizer connecting J1 and J2 is computed automatically — developers do 
 
 | Category    | Exports                                                |
 | ----------- | ------------------------------------------------------ |
-| Entry point | `createBabylonABB6700`                                 |
+| Entry point | `ABB6700Facade`, `createBabylonABB6700`                |
 | Controllers | `createABB6700`, `setJointAngle`, `setPose`, `getPose` |
 | Adapter     | `aBB6700PMAdapter`                                     |
 | Factory     | `makeABB6700FeatureFactory`                            |
@@ -361,8 +394,8 @@ The stabilizer connecting J1 and J2 is computed automatically — developers do 
 
 | Category | Exports                                                            |
 | -------- | ------------------------------------------------------------------ |
-| View     | `ABB6700BabylonView` (`.get()`)                                    |
-| Types    | `ABB6700Pose`, `ABB6700Joint`, `ABB6700VM`, `ABB6700EntityFactory` |
+| View     | `ABB6700BabylonView` (`.get()`), `ABB6700_WHOLE_ARM_HIGHLIGHT_GROUP`               |
+| Types    | `ABB6700Pose`, `ABB6700Joint`, `ABB6700VM`, `ABB6700State`, `ABB6700EntityFactory`, `SmartComponent` |
 
 #### Internal / Advanced (extensibility/testing only — not for normal use)
 

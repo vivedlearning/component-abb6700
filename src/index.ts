@@ -18,8 +18,18 @@ export { ABB6700PM, makeABB6700PM, type ABB6700VM } from "./PMs/ABB6700PM";
 // Adapters
 export { aBB6700PMAdapter } from "./Adapters/aBB6700PMAdapter";
 
+// Facade
+export {
+  ABB6700Facade,
+  ABB_6700_STATE_VERSION,
+  type ABB6700Events,
+  type ABB6700State,
+} from "./Facade/ABB6700Facade";
+export type { SmartComponent } from "./Facade/SmartComponent";
+
 // Views
 export {
+  ABB6700_WHOLE_ARM_HIGHLIGHT_GROUP,
   ABB6700BabylonView,
   makeABB6700BabylonView,
 } from "./Views/ABB6700BabylonView";

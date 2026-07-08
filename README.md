@@ -7,46 +7,62 @@ A reusable 3D robot arm component for VIVED slide apps. Provides domain logic (e
 ## Installation
 
 ```bash
-npm install @vived/component-ABB6700
+npm install @vived/component-abb-6700
 ```
 
 Peer dependencies:
 
 - `@babylonjs/core ^9.0.0`
+- `@vived/app ^6.2.0`
 - `@vived/core ^2.0.0`
 
 ## Usage
 
-```ts
-import {
-  makeABB6700FeatureFactory,
-  ABB6700Repo,
-  ABB6700Entity,
-  makeABB6700BabylonView,
-} from "@vived/component-ABB6700";
-import { Angle, makeAppObjectRepo, makeDomainFactoryRepo } from "@vived/core";
+`ABB6700Facade` is the recommended Host integration surface. Its constructor
+is headless (domain only); `load()` attaches the Babylon view.
 
-// Setup
+```ts
+import { ABB6700Facade } from "@vived/component-abb-6700";
+import { Angle, makeAppObjectRepo, makeDomainFactoryRepo } from "@vived/core";
+import { makeABB6700FeatureFactory } from "@vived/component-abb-6700";
+
+// Register the component's domain factory once per app
 const appObjects = makeAppObjectRepo();
 const domainFactoryRepo = makeDomainFactoryRepo(appObjects);
 makeABB6700FeatureFactory(appObjects);
 domainFactoryRepo.setupDomain();
 
-// Create an instance
-const repo = ABB6700Repo.get(appObjects)!;
-repo.createABB6700Entity("arm-1");
-
-// Create and bind the Babylon.js view
-const ao = appObjects.getOrCreate("arm-1");
-const view = makeABB6700BabylonView(ao);
-await view.setupView();
-view.bindMeshes(loadedMeshes); // meshes from your GLB loader
+// Create an instance and attach the 3D view
+const robot = new ABB6700Facade("arm-1", appObjects);
+await robot.load();
 
 // Control joints
-const entity = ABB6700Entity.getById("arm-1", appObjects)!;
-entity.j1 = Angle.FromDegrees(45);
-entity.j2 = Angle.FromDegrees(90);
+robot.setJointAngle("j1", Angle.FromDegrees(45));
+robot.setPose({
+  j1: Angle.FromDegrees(45),
+  j2: Angle.FromDegrees(90),
+  j3: Angle.FromDegrees(0),
+  j4: Angle.FromDegrees(0),
+  j5: Angle.FromDegrees(0),
+  j6: Angle.FromDegrees(0),
+});
+
+// Serializable state (six joints, in degrees)
+const snapshot = robot.getState();
+robot.applyState(snapshot);
 ```
+
+If you need a fully-wired `AppObject` plus Babylon view in one call without the
+facade, use `createBabylonABB6700`:
+
+```ts
+import { createBabylonABB6700 } from "@vived/component-abb-6700";
+
+const appObject = await createBabylonABB6700("arm-1", appObjects);
+```
+
+See `COMPONENT_KNOWLEDGE.md` for the full API reference, recipes, and the
+host-owned highlight/pointer integration contract.
 
 ## Development
 
@@ -90,10 +106,10 @@ Uploads the file and updates the asset record to point to the new file.
 
 ```bash
 # Upload the ABB6700 GLB as a new asset
-npm run upload-asset -- create public/ABB6700.glb
+npm run upload-asset -- create public/abb_6700.glb
 
 # Update an existing asset with a new version of the file
-npm run upload-asset -- update <asset-uuid> public/ABB6700.glb
+npm run upload-asset -- update <asset-uuid> public/abb_6700.glb
 ```
 
 ### After uploading
@@ -102,7 +118,7 @@ After creating a new asset, add the returned asset ID to `src/component.config.t
 
 ```ts
 assets: [
-  { name: "default", id: "<asset-id>", file: "ABB6700.glb" },
+  { id: "<asset-id>", file: "abb_6700.glb" },
 ],
 ```
 
@@ -118,5 +134,5 @@ assets: [
 Progress and status messages are printed to stderr. The asset ID (on create) is printed to stdout, making it easy to capture in scripts:
 
 ```bash
-ASSET_ID=$(npm run upload-asset -- create public/ABB6700.glb 2>/dev/null)
+ASSET_ID=$(npm run upload-asset -- create public/abb_6700.glb 2>/dev/null)
 ```

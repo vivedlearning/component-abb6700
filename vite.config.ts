@@ -10,7 +10,13 @@ export default defineConfig({
       fileName: () => "index.js",
     },
     rollupOptions: {
-      external: ["@vived/core", "@babylonjs/core", "react", "react-dom"],
+      external: [
+        "@vived/core",
+        "@vived/app",
+        "@babylonjs/core",
+        "react",
+        "react-dom",
+      ],
     },
   },
   test: {

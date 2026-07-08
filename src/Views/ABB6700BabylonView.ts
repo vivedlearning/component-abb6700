@@ -6,6 +6,7 @@ import {
   LoadAssetContainerAsync,
   Scene,
   TransformNode,
+  type Node,
 } from "@babylonjs/core";
 import { BabylonEntity, getAssetBlobURL } from "@vived/app";
 import { ABB6700VM } from "../PMs/ABB6700PM";
@@ -13,6 +14,8 @@ import { aBB6700PMAdapter } from "../Adapters/aBB6700PMAdapter";
 import componentConfig from "../component.config";
 
 export type { ABB6700Joint } from "../UCs/SetJointAngleUC";
+
+export const ABB6700_WHOLE_ARM_HIGHLIGHT_GROUP = "abb_6700";
 
 type MeshMetadata = {
   gltf?: {
@@ -50,6 +53,12 @@ export abstract class ABB6700BabylonView extends AppObjectView {
   /** All meshes in this robot instance, for use as shadow casters */
   abstract get shadowCasters(): AbstractMesh[];
 
+  /** Named Babylon nodes indexed by their resolved objectId/name */
+  abstract get nodesByObjectId(): ReadonlyMap<string, Node>;
+
+  /** Highlightable mesh groups indexed by host-facing highlight group key */
+  abstract get highlightGroupsByObjectId(): ReadonlyMap<string, AbstractMesh[]>;
+
   static get(appObj: AppObject): ABB6700BabylonView | undefined {
     return appObj.getComponent<ABB6700BabylonView>(this.type);
   }
@@ -83,6 +92,8 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
   private eotNode: TransformNode | undefined;
   private _rootNode: TransformNode | undefined;
   private _shadowCasters: AbstractMesh[] = [];
+  private _nodesByObjectId = new Map<string, Node>();
+  private _highlightGroupsByObjectId = new Map<string, AbstractMesh[]>();
 
   get eotTransformNode(): TransformNode | undefined {
     return this.eotNode;
@@ -94,6 +105,14 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
 
   get shadowCasters(): AbstractMesh[] {
     return this._shadowCasters;
+  }
+
+  get nodesByObjectId(): ReadonlyMap<string, Node> {
+    return this._nodesByObjectId;
+  }
+
+  get highlightGroupsByObjectId(): ReadonlyMap<string, AbstractMesh[]> {
+    return this._highlightGroupsByObjectId;
   }
 
   async load(): Promise<void> {
@@ -158,6 +177,8 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
     transformNodes: TransformNode[] = [],
   ): void {
     this._shadowCasters = meshes;
+    this._nodesByObjectId = new Map<string, Node>();
+    this._highlightGroupsByObjectId = new Map<string, AbstractMesh[]>();
     this.j1Node = undefined;
     this.j2Node = undefined;
     this.j3Node = undefined;
@@ -172,6 +193,7 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
 
     for (const node of allNodes) {
       const nodeId = this.resolveNodeId(node);
+      this._nodesByObjectId.set(nodeId, node);
       switch (nodeId) {
         case "joint_1":
           this.j1Node = node;
@@ -201,6 +223,13 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
           this.eotNode = node;
           break;
       }
+    }
+
+    if (meshes.length > 0) {
+      this._highlightGroupsByObjectId.set(
+        ABB6700_WHOLE_ARM_HIGHLIGHT_GROUP,
+        [...meshes],
+      );
     }
 
     // GLB/GLTF imports set rotationQuaternion on nodes, which causes
@@ -251,6 +280,9 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
 
   dispose(): void {
     this.instantiatedEntries?.dispose();
+    this._shadowCasters = [];
+    this._nodesByObjectId = new Map<string, Node>();
+    this._highlightGroupsByObjectId = new Map<string, AbstractMesh[]>();
     aBB6700PMAdapter.unsubscribe(
       this.appObject.id,
       this.appObjects,
