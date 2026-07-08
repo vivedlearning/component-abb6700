@@ -14,20 +14,17 @@ import {
 } from "../Views/ABB6700BabylonView";
 import { ABB6700Repo } from "../Entities/ABB6700Repo";
 import type { SmartComponent } from "./SmartComponent";
+import {
+  ABB_6700_STATE_VERSION,
+  type ABB6700State,
+  type ABB6700Events,
+} from "./ABB6700State";
 
-export const ABB_6700_STATE_VERSION = 1;
-
-export type ABB6700State = {
-  version: number;
-  j1: number;
-  j2: number;
-  j3: number;
-  j4: number;
-  j5: number;
-  j6: number;
-};
-
-export type ABB6700Events = Record<never, never>;
+export {
+  ABB_6700_STATE_VERSION,
+  type ABB6700State,
+  type ABB6700Events,
+} from "./ABB6700State";
 
 const defaultState = (): ABB6700State => ({
   version: ABB_6700_STATE_VERSION,

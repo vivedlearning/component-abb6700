@@ -6,7 +6,7 @@ export default {
   displayName: "ABB 6700",
 
   /** Semantic version */
-  version: "1.3.1",
+  version: "1.4.0",
 
   /** Whether multiple instances can exist in a scene */
   multiInstance: true,
