@@ -22,15 +22,6 @@ describe("PRD: smart-component-facade", () => {
     return () => vm;
   }
 
-  const zeroPose = () => ({
-    j1: Angle.FromDegrees(0),
-    j2: Angle.FromDegrees(0),
-    j3: Angle.FromDegrees(0),
-    j4: Angle.FromDegrees(0),
-    j5: Angle.FromDegrees(0),
-    j6: Angle.FromDegrees(0),
-  });
-
   describe("story-1: As a slide Activity, I want to construct an ABB 6700 facade synchronously, so that I can issue commands and read state before the 3D scene is ready.", () => {
     it("domain is fully wired immediately after construction: commands are callable and state is readable without calling `load()`", () => {
       facade.setJointAngle("j1", Angle.FromDegrees(30));
@@ -103,15 +94,7 @@ describe("PRD: smart-component-facade", () => {
     expect(pose?.j6.degrees).toBe(6);
   });
 
-  it("story-8: As a slide Activity, I want to call `facade.getPose()` to read the current six joint angles, so that I can inspect the arm's configuration.", () => {
-    facade.setJointAngle("j5", Angle.FromDegrees(42));
-
-    const pose = facade.getPose();
-    expect(pose).toBeDefined();
-    expect(pose?.j5.degrees).toBe(42);
-  });
-
-  it("story-9: As a slide Activity, I want `facade.getState()` to return the six joint angles in degrees tagged with the current schema version, so that I can persist the arm's authored configuration.", () => {
+  it("story-8: As a slide Activity, I want `facade.getState()` to return the six joint angles in degrees tagged with the current schema version, so that I can persist the arm's authored configuration.", () => {
     facade.setPose({
       j1: Angle.FromDegrees(10),
       j2: Angle.FromDegrees(20),
@@ -132,7 +115,7 @@ describe("PRD: smart-component-facade", () => {
     });
   });
 
-  describe("story-10: As a slide Activity, I want `facade.applyState(state)` to restore a saved snapshot, so that the arm comes up in the authored configuration.", () => {
+  describe("story-9: As a slide Activity, I want `facade.applyState(state)` to restore a saved snapshot, so that the arm comes up in the authored configuration.", () => {
     it("a snapshot whose version matches the current schema version sets all six joints", () => {
       facade.applyState({
         version: ABB_6700_STATE_VERSION,
@@ -155,32 +138,16 @@ describe("PRD: smart-component-facade", () => {
       });
     });
 
-    it("a snapshot whose version does not match is rejected and leaves the arm unchanged", () => {
-      facade.setPose(zeroPose());
+    it.todo(
+      "a snapshot whose version does not match is still applied — never rejected, never a no-op",
+    );
 
-      facade.applyState({
-        version: ABB_6700_STATE_VERSION + 999,
-        j1: 11,
-        j2: 22,
-        j3: 33,
-        j4: 44,
-        j5: 55,
-        j6: 66,
-      });
-
-      expect(facade.getState()).toEqual({
-        version: ABB_6700_STATE_VERSION,
-        j1: 0,
-        j2: 0,
-        j3: 0,
-        j4: 0,
-        j5: 0,
-        j6: 0,
-      });
-    });
+    it.todo(
+      "a snapshot missing a joint falls back to that joint's entity default rather than producing an invalid angle",
+    );
   });
 
-  describe("story-11: As a slide Activity, I want `facade.onViewModel(cb)` to deliver the current view model and every subsequent change, returning an unsubscribe function, so that my UI stays in sync with the arm.", () => {
+  describe("story-10: As a slide Activity, I want `facade.onViewModel(cb)` to deliver the current view model and every subsequent change, returning an unsubscribe function, so that my UI stays in sync with the arm.", () => {
     it("the subscriber receives an update when a joint changes", () => {
       const seen: number[] = [];
       facade.onViewModel((vm) => {
@@ -207,10 +174,48 @@ describe("PRD: smart-component-facade", () => {
     });
   });
 
-  it("story-12: As a slide Activity, I want `facade.onEvent(...)` to return a valid unsubscribe function even though the ABB 6700 emits no events, so that the facade satisfies the SmartComponent contract uniformly.", () => {
+  it("story-11: As a slide Activity, I want `facade.onEvent(...)` to return a valid unsubscribe function even though the ABB 6700 emits no events, so that the facade satisfies the SmartComponent contract uniformly.", () => {
     const unsubscribe = facade.onEvent("ignored", () => {});
 
     expect(unsubscribe).toEqual(expect.any(Function));
     expect(() => unsubscribe()).not.toThrow();
+  });
+
+  describe("story-12: As a consuming app's SerializedSystem, I want to call `getABB6700State(id, appObjects, version)` to snapshot an arm without constructing a facade, so that persistence stays a domain→domain concern and never imports a view-construction artifact.", () => {
+    it.todo(
+      "returns the six joint angles in degrees tagged with the requested version",
+    );
+
+    it.todo(
+      "an id with no arm behind it resolves to the default state rather than throwing",
+    );
+  });
+
+  describe("story-13: As a consuming app's SerializedSystem, I want to call `applyABB6700State(id, appObjects, state)` to restore a snapshot without constructing a facade, so that a saved arm configuration is applied through the domain seam.", () => {
+    it.todo(
+      "a snapshot whose version matches the current schema version sets all six joints",
+    );
+
+    it.todo(
+      "a snapshot whose version does not match is still applied — never rejected, never a no-op",
+    );
+
+    it.todo(
+      "a snapshot missing a joint falls back to that joint's entity default rather than producing an invalid angle",
+    );
+
+    it.todo(
+      "an id with no arm behind it submits a warning and leaves the domain untouched",
+    );
+  });
+
+  describe("story-14: As a slide Activity, I want the facade and the standalone state controllers to be interchangeable for reading and writing state, so that I can mix the two seams without them diverging.", () => {
+    it.todo(
+      "state written through `facade.applyState` is readable through `getABB6700State`",
+    );
+
+    it.todo(
+      "state written through `applyABB6700State` is readable through `facade.getState`",
+    );
   });
 });

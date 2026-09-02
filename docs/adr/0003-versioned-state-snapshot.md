@@ -1,6 +1,8 @@
+> ⚠️ Superseded by [ADR-0005](0005-best-effort-forward-compatible-apply-state.md) — see that ADR for the current decision on version handling. The snapshot shape decided here (`version` + six joint degrees, stabilizer excluded) is carried forward unchanged; only the reject-on-mismatch behavior is superseded.
+
 # ADR 0003: Versioned activity-authored state snapshot
 
-**Status:** Accepted · 2026-07-08
+**Status:** Superseded by ADR-0005 · 2026-09-02
 
 ## Context
 
