@@ -115,19 +115,19 @@ describe("ABB6700Facade", () => {
     facade.applyState(state);
 
     expect(facade.getState()).toEqual(state);
-    expect(facade.getPose()?.j1.degrees).toBe(10);
-    expect(facade.getPose()?.j2.degrees).toBe(20);
-    expect(facade.getPose()?.j3.degrees).toBe(30);
-    expect(facade.getPose()?.j4.degrees).toBe(40);
-    expect(facade.getPose()?.j5.degrees).toBe(50);
-    expect(facade.getPose()?.j6.degrees).toBe(60);
+    expect(facade.getState().j1).toBe(10);
+    expect(facade.getState().j2).toBe(20);
+    expect(facade.getState().j3).toBe(30);
+    expect(facade.getState().j4).toBe(40);
+    expect(facade.getState().j5).toBe(50);
+    expect(facade.getState().j6).toBe(60);
   });
 
   it("wraps the existing joint controllers", () => {
     const facade = new ABB6700Facade("arm-1", appObjects);
 
     facade.setJointAngle("j2", Angle.FromDegrees(-15));
-    expect(facade.getPose()?.j2.degrees).toBe(-15);
+    expect(facade.getState().j2).toBe(-15);
 
     facade.setPose({
       j1: Angle.FromDegrees(1),

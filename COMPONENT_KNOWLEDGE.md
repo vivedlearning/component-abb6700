@@ -115,7 +115,7 @@ Every facade has these eight members with this exact shape:
 | `load`             | `(variant?: string) => Promise<void>`                         | Attaches the Babylon view. The only async member.                                              |
 | `destroy`          | `() => void`                                                  | Tears down the instance and releases resources.                                                |
 | `getState`         | `() => ABB6700State`                                          | Snapshot the authored configuration.                                                           |
-| `applyState`       | `(state: ABB6700State) => void`                              | Restore a snapshot (version-checked).                                                           |
+| `applyState`       | `(state: ABB6700State) => void`                              | Restore a snapshot (best-effort forward-compatible).                                            |
 
 ### Lifecycle (two-phase)
 
@@ -128,9 +128,10 @@ Every facade has these eight members with this exact shape:
 | --------------- | -------------------------------------------------- | ---------------------------------- |
 | `setPose`       | `(pose: ABB6700Pose) => void`                      | Set all six joints atomically.     |
 | `setJointAngle` | `(joint: ABB6700Joint, angle: Angle) => void`      | Set a single joint.                |
-| `getPose`       | `() => ABB6700Pose \| undefined`                   | Read the current pose.             |
 
-Commands return `void` — none can be blocked by a domain rule. To read state, use `getPose()`, `getState()`, or `onViewModel`.
+Commands return `void` — none can be blocked by a domain rule. To read state, use `getState()` or `onViewModel` — the facade has no separate pose accessor.
+
+> **Migrating from 1.x:** `facade.getPose()` was removed in 2.0.0. Use `getState()` for the authored configuration, `onViewModel()` for live values, or the standalone `getPose` controller (see API Reference below) to read a pose without a facade.
 
 ### Events
 
@@ -142,7 +143,7 @@ The ABB 6700 emits no events. `onEvent` exists only to satisfy the contract and 
 
 ### State snapshot (`ABB6700State`)
 
-`getState()` / `applyState()` capture the authored configuration: `version` plus the six joint angles **in degrees**. The state schema `version` starts at `1` (`ABB_6700_STATE_VERSION`). `applyState` is **version-checked** — a snapshot whose `version` does not match the current schema version is rejected (a warning is submitted) rather than applied. Derived stabilizer state is not stored; it is recomputed from J2 on apply.
+`getState()` / `applyState()` capture the authored configuration: `version` plus the six joint angles **in degrees**. The state schema `version` starts at `1` (`ABB_6700_STATE_VERSION`). `applyState` is **best-effort forward-compatible** (ADR-0005, superseding ADR-0003) — a snapshot is always applied, whatever its `version`: never rejected, never a no-op. Each joint is resolved independently; a joint the snapshot omits falls back to that joint's entity default rather than producing an invalid angle. Derived stabilizer state is not stored; it is recomputed from J2 on apply.
 
 ### Variants & objectId interaction map
 
@@ -164,6 +165,8 @@ For Host integration, prefer `ABB6700Facade`. `createBabylonABB6700` remains the
 | `setJointAngle`             | `(id: string, joint: ABB6700Joint, angle: Angle, appObjects: AppObjectRepo) → void` | Set a single joint angle.                                                       |
 | `setPose`                   | `(id: string, pose: ABB6700Pose, appObjects: AppObjectRepo) → void`                 | Set all 6 joints at once.                                                       |
 | `getPose`                   | `(id: string, appObjects: AppObjectRepo) → ABB6700Pose \| undefined`                | Read the current pose.                                                          |
+| `getABB6700State`           | `(id: string, appObjects: AppObjectRepo, version: number) → ABB6700State`           | Snapshot the authored configuration without a facade. An unknown id resolves to the default state rather than throwing. |
+| `applyABB6700State`         | `(id: string, appObjects: AppObjectRepo, state: ABB6700State) → void`               | Restore a saved snapshot without a facade. Best-effort forward-compatible (ADR-0005); an unknown id submits a warning and leaves the domain untouched. |
 | `makeABB6700FeatureFactory` | `(appObjects: AppObjectRepo) → ABB6700FeatureFactory`                               | Register the feature factory during domain setup.                               |
 | `aBB6700PMAdapter`          | `PmAdapter<ABB6700VM>`                                                              | Subscribe/unsubscribe to view model changes for custom UI.                      |
 
@@ -458,7 +461,7 @@ The stabilizer connecting J1 and J2 is computed automatically — developers do 
 | Category    | Exports                                                |
 | ----------- | ------------------------------------------------------ |
 | Entry point | `ABB6700Facade`, `createBabylonABB6700`                |
-| Controllers | `createABB6700`, `setJointAngle`, `setPose`, `getPose` |
+| Controllers | `createABB6700`, `setJointAngle`, `setPose`, `getPose`, `getABB6700State`, `applyABB6700State` |
 | Adapter     | `aBB6700PMAdapter`                                     |
 | Factory     | `makeABB6700FeatureFactory`                            |
 

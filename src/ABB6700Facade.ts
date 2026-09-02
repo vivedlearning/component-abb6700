@@ -1,7 +1,8 @@
 import { Angle, AppObjectRepo } from "@vived/core";
 import { aBB6700PMAdapter } from "./Domain/Adapters/aBB6700PMAdapter";
+import { applyABB6700State } from "./Domain/Controllers/applyABB6700State";
 import { createABB6700 } from "./Domain/Controllers/createABB6700";
-import { getPose } from "./Domain/Controllers/getPose";
+import { getABB6700State } from "./Domain/Controllers/getABB6700State";
 import { setJointAngle } from "./Domain/Controllers/setJointAngle";
 import { setPose } from "./Domain/Controllers/setPose";
 import { ABB6700Entity } from "./Domain/Entities/ABB6700Entity";
@@ -14,23 +15,13 @@ import {
   ABB_6700_STATE_VERSION,
   type ABB6700State,
   type ABB6700Events,
-} from "./ABB6700State";
+} from "./Domain/Entities/ABB6700State";
 
 export {
   ABB_6700_STATE_VERSION,
   type ABB6700State,
   type ABB6700Events,
-} from "./ABB6700State";
-
-const defaultState = (): ABB6700State => ({
-  version: ABB_6700_STATE_VERSION,
-  j1: 0,
-  j2: 0,
-  j3: 0,
-  j4: 0,
-  j5: 0,
-  j6: 0,
-});
+} from "./Domain/Entities/ABB6700State";
 
 export class ABB6700Facade implements SmartComponent {
   readonly interfaceVersion = 1;
@@ -76,42 +67,12 @@ export class ABB6700Facade implements SmartComponent {
     setJointAngle(this.id, joint, angle, this.appObjects);
   }
 
-  getPose(): ABB6700Pose | undefined {
-    return getPose(this.id, this.appObjects);
-  }
-
   getState(): ABB6700State {
-    const pose = this.getPose();
-    if (!pose) return defaultState();
-
-    return {
-      version: ABB_6700_STATE_VERSION,
-      j1: pose.j1.degrees,
-      j2: pose.j2.degrees,
-      j3: pose.j3.degrees,
-      j4: pose.j4.degrees,
-      j5: pose.j5.degrees,
-      j6: pose.j6.degrees,
-    };
+    return getABB6700State(this.id, this.appObjects, ABB_6700_STATE_VERSION);
   }
 
   applyState(state: ABB6700State): void {
-    if (state.version !== ABB_6700_STATE_VERSION) {
-      this.appObjects.submitWarning(
-        "ABB6700Facade.applyState",
-        `Unsupported state version: ${state.version}`,
-      );
-      return;
-    }
-
-    this.setPose({
-      j1: Angle.FromDegrees(state.j1),
-      j2: Angle.FromDegrees(state.j2),
-      j3: Angle.FromDegrees(state.j3),
-      j4: Angle.FromDegrees(state.j4),
-      j5: Angle.FromDegrees(state.j5),
-      j6: Angle.FromDegrees(state.j6),
-    });
+    applyABB6700State(this.id, this.appObjects, state);
   }
 
   onEvent(event: string, cb: (...args: never[]) => void): () => void;

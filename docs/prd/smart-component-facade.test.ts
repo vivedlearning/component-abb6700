@@ -1,9 +1,16 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Angle, AppObjectRepo } from "@vived/core";
 import { makeDomainForTesting } from "../../src/Domain/makeDomainForTesting";
 import { ABB6700Facade, ABB_6700_STATE_VERSION } from "../../src/ABB6700Facade";
 import { aBB6700PMAdapter } from "../../src/Domain/Adapters/aBB6700PMAdapter";
 import type { ABB6700VM } from "../../src/Domain/PMs/ABB6700PM";
+import { applyABB6700State } from "../../src/Domain/Controllers/applyABB6700State";
+import { setPose } from "../../src/Domain/Controllers/setPose";
+import { getABB6700State } from "../../src/Domain/Controllers/getABB6700State";
+import {
+  defaultABB6700State,
+  type ABB6700State,
+} from "../../src/Domain/Entities/ABB6700State";
 
 describe("PRD: smart-component-facade", () => {
   let appObjects: AppObjectRepo;
@@ -22,20 +29,10 @@ describe("PRD: smart-component-facade", () => {
     return () => vm;
   }
 
-  const zeroPose = () => ({
-    j1: Angle.FromDegrees(0),
-    j2: Angle.FromDegrees(0),
-    j3: Angle.FromDegrees(0),
-    j4: Angle.FromDegrees(0),
-    j5: Angle.FromDegrees(0),
-    j6: Angle.FromDegrees(0),
-  });
-
   describe("story-1: As a slide Activity, I want to construct an ABB 6700 facade synchronously, so that I can issue commands and read state before the 3D scene is ready.", () => {
     it("domain is fully wired immediately after construction: commands are callable and state is readable without calling `load()`", () => {
       facade.setJointAngle("j1", Angle.FromDegrees(30));
 
-      expect(facade.getPose()?.j1.degrees).toBe(30);
       expect(facade.getState().j1).toBe(30);
     });
 
@@ -80,7 +77,6 @@ describe("PRD: smart-component-facade", () => {
 
     facade.setJointAngle("j2", Angle.FromDegrees(-15));
 
-    expect(facade.getPose()?.j2.degrees).toBe(-15);
     expect(vm()?.j2.degrees).toBe(-15);
   });
 
@@ -94,24 +90,16 @@ describe("PRD: smart-component-facade", () => {
       j6: Angle.FromDegrees(6),
     });
 
-    const pose = facade.getPose();
-    expect(pose?.j1.degrees).toBe(1);
-    expect(pose?.j2.degrees).toBe(2);
-    expect(pose?.j3.degrees).toBe(3);
-    expect(pose?.j4.degrees).toBe(4);
-    expect(pose?.j5.degrees).toBe(5);
-    expect(pose?.j6.degrees).toBe(6);
+    const state = facade.getState();
+    expect(state.j1).toBe(1);
+    expect(state.j2).toBe(2);
+    expect(state.j3).toBe(3);
+    expect(state.j4).toBe(4);
+    expect(state.j5).toBe(5);
+    expect(state.j6).toBe(6);
   });
 
-  it("story-8: As a slide Activity, I want to call `facade.getPose()` to read the current six joint angles, so that I can inspect the arm's configuration.", () => {
-    facade.setJointAngle("j5", Angle.FromDegrees(42));
-
-    const pose = facade.getPose();
-    expect(pose).toBeDefined();
-    expect(pose?.j5.degrees).toBe(42);
-  });
-
-  it("story-9: As a slide Activity, I want `facade.getState()` to return the six joint angles in degrees tagged with the current schema version, so that I can persist the arm's authored configuration.", () => {
+  it("story-8: As a slide Activity, I want `facade.getState()` to return the six joint angles in degrees tagged with the current schema version, so that I can persist the arm's authored configuration.", () => {
     facade.setPose({
       j1: Angle.FromDegrees(10),
       j2: Angle.FromDegrees(20),
@@ -132,7 +120,7 @@ describe("PRD: smart-component-facade", () => {
     });
   });
 
-  describe("story-10: As a slide Activity, I want `facade.applyState(state)` to restore a saved snapshot, so that the arm comes up in the authored configuration.", () => {
+  describe("story-9: As a slide Activity, I want `facade.applyState(state)` to restore a saved snapshot, so that the arm comes up in the authored configuration.", () => {
     it("a snapshot whose version matches the current schema version sets all six joints", () => {
       facade.applyState({
         version: ABB_6700_STATE_VERSION,
@@ -155,9 +143,7 @@ describe("PRD: smart-component-facade", () => {
       });
     });
 
-    it("a snapshot whose version does not match is rejected and leaves the arm unchanged", () => {
-      facade.setPose(zeroPose());
-
+    it("a snapshot whose version does not match is still applied — never rejected, never a no-op", () => {
       facade.applyState({
         version: ABB_6700_STATE_VERSION + 999,
         j1: 11,
@@ -170,17 +156,41 @@ describe("PRD: smart-component-facade", () => {
 
       expect(facade.getState()).toEqual({
         version: ABB_6700_STATE_VERSION,
-        j1: 0,
-        j2: 0,
-        j3: 0,
-        j4: 0,
-        j5: 0,
-        j6: 0,
+        j1: 11,
+        j2: 22,
+        j3: 33,
+        j4: 44,
+        j5: 55,
+        j6: 66,
       });
+    });
+
+    it("a snapshot missing a joint falls back to that joint's entity default rather than producing an invalid angle", () => {
+      const snapshot = {
+        version: ABB_6700_STATE_VERSION,
+        j1: 11,
+        j2: 22,
+        j3: 33,
+        j5: 55,
+        j6: 66,
+      } as unknown as ABB6700State;
+
+      facade.applyState(snapshot);
+
+      expect(facade.getState()).toEqual({
+        version: ABB_6700_STATE_VERSION,
+        j1: 11,
+        j2: 22,
+        j3: 33,
+        j4: 0,
+        j5: 55,
+        j6: 66,
+      });
+      expect(Number.isNaN(facade.getState().j4)).toBe(false);
     });
   });
 
-  describe("story-11: As a slide Activity, I want `facade.onViewModel(cb)` to deliver the current view model and every subsequent change, returning an unsubscribe function, so that my UI stays in sync with the arm.", () => {
+  describe("story-10: As a slide Activity, I want `facade.onViewModel(cb)` to deliver the current view model and every subsequent change, returning an unsubscribe function, so that my UI stays in sync with the arm.", () => {
     it("the subscriber receives an update when a joint changes", () => {
       const seen: number[] = [];
       facade.onViewModel((vm) => {
@@ -207,10 +217,188 @@ describe("PRD: smart-component-facade", () => {
     });
   });
 
-  it("story-12: As a slide Activity, I want `facade.onEvent(...)` to return a valid unsubscribe function even though the ABB 6700 emits no events, so that the facade satisfies the SmartComponent contract uniformly.", () => {
+  it("story-11: As a slide Activity, I want `facade.onEvent(...)` to return a valid unsubscribe function even though the ABB 6700 emits no events, so that the facade satisfies the SmartComponent contract uniformly.", () => {
     const unsubscribe = facade.onEvent("ignored", () => {});
 
     expect(unsubscribe).toEqual(expect.any(Function));
     expect(() => unsubscribe()).not.toThrow();
+  });
+
+  describe("story-12: As a consuming app's SerializedSystem, I want to call `getABB6700State(id, appObjects, version)` to snapshot an arm without constructing a facade, so that persistence stays a domain→domain concern and never imports a view-construction artifact.", () => {
+    it("returns the six joint angles in degrees tagged with the requested version", () => {
+      setPose(
+        "arm-1",
+        {
+          j1: Angle.FromDegrees(11),
+          j2: Angle.FromDegrees(22),
+          j3: Angle.FromDegrees(33),
+          j4: Angle.FromDegrees(44),
+          j5: Angle.FromDegrees(55),
+          j6: Angle.FromDegrees(66),
+        },
+        appObjects,
+      );
+
+      const requestedVersion = ABB_6700_STATE_VERSION + 999;
+      const state = getABB6700State("arm-1", appObjects, requestedVersion);
+
+      expect(state).toEqual({
+        version: requestedVersion,
+        j1: 11,
+        j2: 22,
+        j3: 33,
+        j4: 44,
+        j5: 55,
+        j6: 66,
+      });
+    });
+
+    it("an id with no arm behind it resolves to the default state rather than throwing", () => {
+      const requestedVersion = ABB_6700_STATE_VERSION + 5;
+
+      expect(() =>
+        getABB6700State("no-arm-here", appObjects, requestedVersion),
+      ).not.toThrow();
+
+      expect(getABB6700State("no-arm-here", appObjects, requestedVersion)).toEqual(
+        defaultABB6700State(requestedVersion),
+      );
+    });
+  });
+
+  describe("story-13: As a consuming app's SerializedSystem, I want to call `applyABB6700State(id, appObjects, state)` to restore a snapshot without constructing a facade, so that a saved arm configuration is applied through the domain seam.", () => {
+    it("a snapshot whose version matches the current schema version sets all six joints", () => {
+      const vm = readVM();
+
+      applyABB6700State("arm-1", appObjects, {
+        version: ABB_6700_STATE_VERSION,
+        j1: 11,
+        j2: 22,
+        j3: 33,
+        j4: 44,
+        j5: 55,
+        j6: 66,
+      });
+
+      expect(vm()?.j1.degrees).toBe(11);
+      expect(vm()?.j2.degrees).toBe(22);
+      expect(vm()?.j3.degrees).toBe(33);
+      expect(vm()?.j4.degrees).toBe(44);
+      expect(vm()?.j5.degrees).toBe(55);
+      expect(vm()?.j6.degrees).toBe(66);
+    });
+
+    it("a snapshot whose version does not match is still applied — never rejected, never a no-op", () => {
+      const vm = readVM();
+
+      applyABB6700State("arm-1", appObjects, {
+        version: ABB_6700_STATE_VERSION + 999,
+        j1: 11,
+        j2: 22,
+        j3: 33,
+        j4: 44,
+        j5: 55,
+        j6: 66,
+      });
+
+      expect(vm()?.j1.degrees).toBe(11);
+      expect(vm()?.j2.degrees).toBe(22);
+      expect(vm()?.j3.degrees).toBe(33);
+      expect(vm()?.j4.degrees).toBe(44);
+      expect(vm()?.j5.degrees).toBe(55);
+      expect(vm()?.j6.degrees).toBe(66);
+    });
+
+    it("a snapshot missing a joint falls back to that joint's entity default rather than producing an invalid angle", () => {
+      const vm = readVM();
+
+      const snapshot = {
+        version: ABB_6700_STATE_VERSION,
+        j1: 11,
+        j2: 22,
+        j3: 33,
+        j5: 55,
+        j6: 66,
+      } as unknown as ABB6700State;
+
+      applyABB6700State("arm-1", appObjects, snapshot);
+
+      expect(vm()?.j1.degrees).toBe(11);
+      expect(vm()?.j2.degrees).toBe(22);
+      expect(vm()?.j3.degrees).toBe(33);
+      expect(vm()?.j4.degrees).toBe(0);
+      expect(vm()?.j5.degrees).toBe(55);
+      expect(vm()?.j6.degrees).toBe(66);
+      expect(Number.isNaN(vm()?.j4.degrees)).toBe(false);
+    });
+
+    it("an id with no arm behind it submits a warning and leaves the domain untouched", () => {
+      const warnSpy = vi.spyOn(appObjects, "submitWarning");
+      const vm = readVM();
+
+      applyABB6700State("no-arm-here", appObjects, {
+        version: ABB_6700_STATE_VERSION,
+        j1: 11,
+        j2: 22,
+        j3: 33,
+        j4: 44,
+        j5: 55,
+        j6: 66,
+      });
+
+      expect(warnSpy).toHaveBeenCalled();
+      expect(vm()?.j1.degrees).toBe(0);
+      expect(vm()?.j2.degrees).toBe(0);
+      expect(vm()?.j3.degrees).toBe(0);
+      expect(vm()?.j4.degrees).toBe(0);
+      expect(vm()?.j5.degrees).toBe(0);
+      expect(vm()?.j6.degrees).toBe(0);
+    });
+  });
+
+  describe("story-14: As a slide Activity, I want the facade and the standalone state controllers to be interchangeable for reading and writing state, so that I can mix the two seams without them diverging.", () => {
+    it("state written through `facade.applyState` is readable through `getABB6700State`", () => {
+      facade.applyState({
+        version: ABB_6700_STATE_VERSION,
+        j1: 11,
+        j2: 22,
+        j3: 33,
+        j4: 44,
+        j5: 55,
+        j6: 66,
+      });
+
+      expect(getABB6700State("arm-1", appObjects, ABB_6700_STATE_VERSION)).toEqual({
+        version: ABB_6700_STATE_VERSION,
+        j1: 11,
+        j2: 22,
+        j3: 33,
+        j4: 44,
+        j5: 55,
+        j6: 66,
+      });
+    });
+
+    it("state written through `applyABB6700State` is readable through `facade.getState`", () => {
+      applyABB6700State("arm-1", appObjects, {
+        version: ABB_6700_STATE_VERSION,
+        j1: 11,
+        j2: 22,
+        j3: 33,
+        j4: 44,
+        j5: 55,
+        j6: 66,
+      });
+
+      expect(facade.getState()).toEqual({
+        version: ABB_6700_STATE_VERSION,
+        j1: 11,
+        j2: 22,
+        j3: 33,
+        j4: 44,
+        j5: 55,
+        j6: 66,
+      });
+    });
   });
 });

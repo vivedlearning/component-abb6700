@@ -25,7 +25,7 @@ The complete set of all six joint angles applied atomically. A pose is the unit 
 
 **Type:** `ABB6700Pose` — `{ j1: Angle; j2: Angle; …; j6: Angle }` (all six required)
 
-Set via `setPose` (controller) or `ABB6700Facade.setPose`. Read via `getPose` / `ABB6700Facade.getPose`, which returns `undefined` before the instance exists.
+Set via `setPose` (controller) or `ABB6700Facade.setPose`. Read via the standalone `getPose` controller, which returns `undefined` before the instance exists; `ABB6700Facade` has no pose accessor of its own — use `getState()` for authored configuration or `onViewModel` for the live pose (see ADR-0006).
 
 _Avoid_: partial poses — a pose always carries all six joints. To move one joint, use `setJointAngle`.
 
@@ -79,7 +79,7 @@ The structural interface convention that all smart-component facades implement �
 - `load(variant?): Promise<void>` — attach the 3D view and complete async setup
 - `destroy(): void` — tear down the instance and release resources
 - `getState(): ABB6700State` — snapshot the activity-authored configuration
-- `applyState(state): void` — restore a snapshot (versioned, best-effort)
+- `applyState(state): void` — restore a snapshot (best-effort forward-compatible)
 
 Not sourced from a shared package. Enforced by convention and TypeScript structural typing — any object with this shape satisfies the contract. A host may define this interface locally; any conforming facade satisfies it.
 
@@ -89,7 +89,7 @@ _Avoid_: calling this a "base class" or "interface package" — it is a shape co
 
 ## ABB6700Facade
 
-The single host-facing entry point for the ABB 6700 smart component. Implements the SmartComponent convention and adds component-specific typed commands (`setPose`, `setJointAngle`, `getPose`).
+The single host-facing entry point for the ABB 6700 smart component. Implements the SmartComponent convention and adds component-specific typed commands (`setPose`, `setJointAngle`). Its read surface is `getState()` (authored configuration) and `onViewModel()` (live values) — no separate pose accessor (see ADR-0006).
 
 Two-phase lifecycle (see ADR-0002):
 
@@ -130,9 +130,22 @@ _Avoid_: storing angles as `Angle` objects or radians in state — state is plai
 The two facade methods that expose the state snapshot contract:
 
 - `getState(): ABB6700State` — returns the current six joint angles as degrees, tagged with the current version.
-- `applyState(state: ABB6700State)` — applies a saved snapshot by setting the full pose. Best-effort and versioned (see ADR-0003): a state whose `version` does not match `ABB_6700_STATE_VERSION` is rejected with a submitted warning rather than applied.
+- `applyState(state: ABB6700State)` — applies a saved snapshot by setting the full pose. **Best-effort forward-compatible** (see ADR-0005, superseding ADR-0003): the snapshot is always applied, whatever its `version` — never rejected, never a no-op. Each joint is resolved independently; a joint the snapshot omits falls back to that joint's entity default rather than producing an invalid angle.
 
 `applyState` is safe to call before `load()`; the Babylon view reads entity state at load time and comes up in the correct configuration.
+
+---
+
+## State controllers (`getABB6700State` / `applyABB6700State`)
+
+The domain-only serialization seam: standalone controllers, exported directly from the package, that read and restore the same state-snapshot contract as `getState` / `applyState` without constructing a facade. `ABB6700Facade.getState` / `.applyState` are one-line delegations to these controllers, so the two seams cannot drift apart.
+
+- `getABB6700State(id, appObjects, version)` — returns the six joint angles tagged with `version`. An id with no arm behind it submits a warning and resolves to the entity-default snapshot rather than throwing.
+- `applyABB6700State(id, appObjects, state)` — same best-effort forward-compatible behavior as `applyState`. An id with no arm behind it submits a warning and leaves the domain untouched.
+
+Exists so a consuming app's domain-layer `SerializedSystem` can persist and restore an arm without importing `ABB6700Facade`, which owns `load()`'s Babylon view construction (see ADR-0006).
+
+_Avoid_: routing persistence through the facade in a domain-only serializer — use these controllers instead.
 
 ---
 

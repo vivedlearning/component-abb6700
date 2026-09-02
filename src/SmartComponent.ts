@@ -1,5 +1,5 @@
 import type { ABB6700VM } from "./Domain/PMs/ABB6700PM";
-import type { ABB6700State } from "./ABB6700State";
+import type { ABB6700State } from "./Domain/Entities/ABB6700State";
 
 export interface SmartComponent {
   readonly id: string;
