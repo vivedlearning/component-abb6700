@@ -2,6 +2,53 @@
 
 All notable changes to `@vived/component-ABB6700` will be documented in this file.
 
+## [2.0.0] — 2026-09-02
+
+### BREAKING CHANGES
+
+- **`ABB6700Facade.getPose()` is removed.** Use `getState()` for the authored
+  configuration, `onViewModel()` for live values, or the standalone `getPose`
+  controller — which is still exported and unchanged. The facade's read surface is
+  now `getState()` + `onViewModel()` only, matching every other VIVED smart
+  component facade. See ADR-0006.
+- **`applyState` no longer rejects a version mismatch.** It was version-checked in
+  1.4.0 and returned without applying; it is now best-effort forward-compatible and
+  always applies the snapshot. If you relied on a mismatched snapshot being ignored,
+  that guard is gone — version handling is the component's responsibility now. See
+  ADR-0005, which supersedes ADR-0003.
+
+### Added
+
+- **Standalone state controllers** — `getABB6700State(id, appObjects, version)` and
+  `applyABB6700State(id, appObjects, state)`, exported from the package root. These
+  let a consuming app's domain layer persist and restore an arm without constructing
+  a facade, so serialization stays a domain→domain concern and never pulls in the
+  facade's Babylon view construction. Same shape as the controllers already shipped
+  by `-abb-controller`, `-electrical-cabinet`, `-pneumatic-panel` and `-stacklight`.
+
+### Changed
+
+- **`getState` / `applyState` are one-line delegations** to the new controllers, so
+  the facade holds no state logic and the two seams cannot drift apart.
+- **`applyState` resolves each joint independently.** A joint absent from the
+  snapshot falls back to that joint's entity default instead of the whole snapshot
+  being discarded.
+- **Packaging** — the package is marked `UNLICENSED` with a root `LICENSE`
+  (proprietary, internal use only), ships `COMPONENT_KNOWLEDGE.md` and
+  `CHANGELOG.md` alongside `dist/` via the `files` allowlist, and declares
+  `publishConfig.access: "public"`.
+
+### Fixed
+
+- **Invalid angle from a partial snapshot.** `applyState` previously passed an
+  absent joint straight to `Angle.FromDegrees(undefined)`, producing a `NaN` angle.
+  Joint values are now guarded for finiteness, which also covers `null` and
+  non-numeric values from corrupt storage.
+
+### Removed
+
+- `ABB6700Facade.getPose()` — see BREAKING CHANGES.
+
 ## [1.4.0] — 2026-07-08
 
 ### Added

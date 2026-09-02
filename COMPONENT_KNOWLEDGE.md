@@ -5,7 +5,7 @@
 The ABB 6700 is a 6-axis industrial robot arm smart component. It provides a fully rigged 3D model with 6 degrees of freedom (joints J1–J6) and an automatically-computed stabilizer linkage. Developers can set individual joint angles or full poses through simple controller functions. Use this component when your slide app needs an articulated robot arm for industrial simulation, robotics education, or manufacturing visualization.
 
 - **Package**: `@vived/component-abb-6700`
-- **Version**: 1.4.0
+- **Version**: 2.0.0
 - **Interface version**: 1 (`SmartComponent` contract implemented by `ABB6700Facade`)
 - **GitHub**: `vivedlearning/component-abb6700`
 
@@ -449,7 +449,7 @@ The stabilizer connecting J1 and J2 is computed automatically — developers do 
 | -------------- | --------------------------------- |
 | Package              | `@vived/component-abb-6700`       |
 | GitHub               | `vivedlearning/component-abb6700` |
-| Version              | 1.4.0                             |
+| Version              | 2.0.0                             |
 | Interface version    | 1                                 |
 | State schema version | 1 (`ABB6700State.version`)        |
 | Multi-instance       | Yes                               |
