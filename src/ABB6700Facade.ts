@@ -14,13 +14,13 @@ import {
   ABB_6700_STATE_VERSION,
   type ABB6700State,
   type ABB6700Events,
-} from "./ABB6700State";
+} from "./Domain/Entities/ABB6700State";
 
 export {
   ABB_6700_STATE_VERSION,
   type ABB6700State,
   type ABB6700Events,
-} from "./ABB6700State";
+} from "./Domain/Entities/ABB6700State";
 
 const defaultState = (): ABB6700State => ({
   version: ABB_6700_STATE_VERSION,

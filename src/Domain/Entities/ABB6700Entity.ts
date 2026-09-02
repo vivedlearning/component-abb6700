@@ -5,6 +5,7 @@ import {
   AppObjectRepo,
   MemoizedAngle,
 } from "@vived/core";
+import { ABB_6700_DEFAULT_JOINT_DEGREES } from "./ABB6700State";
 
 /**
  * ABB 6700 Entity
@@ -70,27 +71,27 @@ export function makeABB6700Entity(appObject: AppObject): ABB6700Entity {
 
 class ABB6700EntityImp extends ABB6700Entity {
   private memoizedJ1 = new MemoizedAngle(
-    Angle.FromDegrees(0),
+    Angle.FromDegrees(ABB_6700_DEFAULT_JOINT_DEGREES),
     this.notifyOnChange,
   );
   private memoizedJ2 = new MemoizedAngle(
-    Angle.FromDegrees(0),
+    Angle.FromDegrees(ABB_6700_DEFAULT_JOINT_DEGREES),
     this.notifyOnChange,
   );
   private memoizedJ3 = new MemoizedAngle(
-    Angle.FromDegrees(0),
+    Angle.FromDegrees(ABB_6700_DEFAULT_JOINT_DEGREES),
     this.notifyOnChange,
   );
   private memoizedJ4 = new MemoizedAngle(
-    Angle.FromDegrees(0),
+    Angle.FromDegrees(ABB_6700_DEFAULT_JOINT_DEGREES),
     this.notifyOnChange,
   );
   private memoizedJ5 = new MemoizedAngle(
-    Angle.FromDegrees(0),
+    Angle.FromDegrees(ABB_6700_DEFAULT_JOINT_DEGREES),
     this.notifyOnChange,
   );
   private memoizedJ6 = new MemoizedAngle(
-    Angle.FromDegrees(0),
+    Angle.FromDegrees(ABB_6700_DEFAULT_JOINT_DEGREES),
     this.notifyOnChange,
   );
   private memoizedStabilizerAngle = new MemoizedAngle(
