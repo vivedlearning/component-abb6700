@@ -5,7 +5,12 @@ import { ABB6700Facade, ABB_6700_STATE_VERSION } from "../../src/ABB6700Facade";
 import { aBB6700PMAdapter } from "../../src/Domain/Adapters/aBB6700PMAdapter";
 import type { ABB6700VM } from "../../src/Domain/PMs/ABB6700PM";
 import { applyABB6700State } from "../../src/Domain/Controllers/applyABB6700State";
-import type { ABB6700State } from "../../src/Domain/Entities/ABB6700State";
+import { setPose } from "../../src/Domain/Controllers/setPose";
+import { getABB6700State } from "../../src/Domain/Controllers/getABB6700State";
+import {
+  defaultABB6700State,
+  type ABB6700State,
+} from "../../src/Domain/Entities/ABB6700State";
 
 describe("PRD: smart-component-facade", () => {
   let appObjects: AppObjectRepo;
@@ -184,13 +189,45 @@ describe("PRD: smart-component-facade", () => {
   });
 
   describe("story-12: As a consuming app's SerializedSystem, I want to call `getABB6700State(id, appObjects, version)` to snapshot an arm without constructing a facade, so that persistence stays a domain→domain concern and never imports a view-construction artifact.", () => {
-    it.todo(
-      "returns the six joint angles in degrees tagged with the requested version",
-    );
+    it("returns the six joint angles in degrees tagged with the requested version", () => {
+      setPose(
+        "arm-1",
+        {
+          j1: Angle.FromDegrees(11),
+          j2: Angle.FromDegrees(22),
+          j3: Angle.FromDegrees(33),
+          j4: Angle.FromDegrees(44),
+          j5: Angle.FromDegrees(55),
+          j6: Angle.FromDegrees(66),
+        },
+        appObjects,
+      );
 
-    it.todo(
-      "an id with no arm behind it resolves to the default state rather than throwing",
-    );
+      const requestedVersion = ABB_6700_STATE_VERSION + 999;
+      const state = getABB6700State("arm-1", appObjects, requestedVersion);
+
+      expect(state).toEqual({
+        version: requestedVersion,
+        j1: 11,
+        j2: 22,
+        j3: 33,
+        j4: 44,
+        j5: 55,
+        j6: 66,
+      });
+    });
+
+    it("an id with no arm behind it resolves to the default state rather than throwing", () => {
+      const requestedVersion = ABB_6700_STATE_VERSION + 5;
+
+      expect(() =>
+        getABB6700State("no-arm-here", appObjects, requestedVersion),
+      ).not.toThrow();
+
+      expect(getABB6700State("no-arm-here", appObjects, requestedVersion)).toEqual(
+        defaultABB6700State(requestedVersion),
+      );
+    });
   });
 
   describe("story-13: As a consuming app's SerializedSystem, I want to call `applyABB6700State(id, appObjects, state)` to restore a snapshot without constructing a facade, so that a saved arm configuration is applied through the domain seam.", () => {
