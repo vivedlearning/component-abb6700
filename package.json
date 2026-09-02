@@ -1,13 +1,17 @@
 {
   "name": "@vived/component-abb-6700",
-  "version": "1.4.0",
+  "version": "2.0.0",
   "description": "ABB 6700 — VIVED Smart Component",
   "private": false,
   "license": "UNLICENSED",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": ["dist", "COMPONENT_KNOWLEDGE.md", "CHANGELOG.md"],
+  "files": [
+    "dist",
+    "COMPONENT_KNOWLEDGE.md",
+    "CHANGELOG.md"
+  ],
   "publishConfig": {
     "access": "public"
   },
