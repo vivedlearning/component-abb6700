@@ -3,7 +3,10 @@
 This document is for contributors and maintainers of `@vived/component-abb-6700`.
 Use `COMPONENT_KNOWLEDGE.md` for Vivian training and consumer-facing usage guidance.
 
-For architecture questions, use Vivian (MCP) as the primary expert and reference source.
+For architecture questions, consult Vivian — the VIVED team's canon in the
+[`vivedlearning/vivian-knowledge`](https://github.com/vivedlearning/vivian-knowledge) repo.
+It is plain markdown read with `gh`; start from its `index.md`, whose one-line page
+descriptions are the retrieval mechanism.
 
 ## Architecture Overview
 
