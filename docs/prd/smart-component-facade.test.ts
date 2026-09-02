@@ -1,9 +1,11 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Angle, AppObjectRepo } from "@vived/core";
 import { makeDomainForTesting } from "../../src/Domain/makeDomainForTesting";
 import { ABB6700Facade, ABB_6700_STATE_VERSION } from "../../src/ABB6700Facade";
 import { aBB6700PMAdapter } from "../../src/Domain/Adapters/aBB6700PMAdapter";
 import type { ABB6700VM } from "../../src/Domain/PMs/ABB6700PM";
+import { applyABB6700State } from "../../src/Domain/Controllers/applyABB6700State";
+import type { ABB6700State } from "../../src/Domain/Entities/ABB6700State";
 
 describe("PRD: smart-component-facade", () => {
   let appObjects: AppObjectRepo;
@@ -192,21 +194,93 @@ describe("PRD: smart-component-facade", () => {
   });
 
   describe("story-13: As a consuming app's SerializedSystem, I want to call `applyABB6700State(id, appObjects, state)` to restore a snapshot without constructing a facade, so that a saved arm configuration is applied through the domain seam.", () => {
-    it.todo(
-      "a snapshot whose version matches the current schema version sets all six joints",
-    );
+    it("a snapshot whose version matches the current schema version sets all six joints", () => {
+      const vm = readVM();
 
-    it.todo(
-      "a snapshot whose version does not match is still applied — never rejected, never a no-op",
-    );
+      applyABB6700State("arm-1", appObjects, {
+        version: ABB_6700_STATE_VERSION,
+        j1: 11,
+        j2: 22,
+        j3: 33,
+        j4: 44,
+        j5: 55,
+        j6: 66,
+      });
 
-    it.todo(
-      "a snapshot missing a joint falls back to that joint's entity default rather than producing an invalid angle",
-    );
+      expect(vm()?.j1.degrees).toBe(11);
+      expect(vm()?.j2.degrees).toBe(22);
+      expect(vm()?.j3.degrees).toBe(33);
+      expect(vm()?.j4.degrees).toBe(44);
+      expect(vm()?.j5.degrees).toBe(55);
+      expect(vm()?.j6.degrees).toBe(66);
+    });
 
-    it.todo(
-      "an id with no arm behind it submits a warning and leaves the domain untouched",
-    );
+    it("a snapshot whose version does not match is still applied — never rejected, never a no-op", () => {
+      const vm = readVM();
+
+      applyABB6700State("arm-1", appObjects, {
+        version: ABB_6700_STATE_VERSION + 999,
+        j1: 11,
+        j2: 22,
+        j3: 33,
+        j4: 44,
+        j5: 55,
+        j6: 66,
+      });
+
+      expect(vm()?.j1.degrees).toBe(11);
+      expect(vm()?.j2.degrees).toBe(22);
+      expect(vm()?.j3.degrees).toBe(33);
+      expect(vm()?.j4.degrees).toBe(44);
+      expect(vm()?.j5.degrees).toBe(55);
+      expect(vm()?.j6.degrees).toBe(66);
+    });
+
+    it("a snapshot missing a joint falls back to that joint's entity default rather than producing an invalid angle", () => {
+      const vm = readVM();
+
+      const snapshot = {
+        version: ABB_6700_STATE_VERSION,
+        j1: 11,
+        j2: 22,
+        j3: 33,
+        j5: 55,
+        j6: 66,
+      } as unknown as ABB6700State;
+
+      applyABB6700State("arm-1", appObjects, snapshot);
+
+      expect(vm()?.j1.degrees).toBe(11);
+      expect(vm()?.j2.degrees).toBe(22);
+      expect(vm()?.j3.degrees).toBe(33);
+      expect(vm()?.j4.degrees).toBe(0);
+      expect(vm()?.j5.degrees).toBe(55);
+      expect(vm()?.j6.degrees).toBe(66);
+      expect(Number.isNaN(vm()?.j4.degrees)).toBe(false);
+    });
+
+    it("an id with no arm behind it submits a warning and leaves the domain untouched", () => {
+      const warnSpy = vi.spyOn(appObjects, "submitWarning");
+      const vm = readVM();
+
+      applyABB6700State("no-arm-here", appObjects, {
+        version: ABB_6700_STATE_VERSION,
+        j1: 11,
+        j2: 22,
+        j3: 33,
+        j4: 44,
+        j5: 55,
+        j6: 66,
+      });
+
+      expect(warnSpy).toHaveBeenCalled();
+      expect(vm()?.j1.degrees).toBe(0);
+      expect(vm()?.j2.degrees).toBe(0);
+      expect(vm()?.j3.degrees).toBe(0);
+      expect(vm()?.j4.degrees).toBe(0);
+      expect(vm()?.j5.degrees).toBe(0);
+      expect(vm()?.j6.degrees).toBe(0);
+    });
   });
 
   describe("story-14: As a slide Activity, I want the facade and the standalone state controllers to be interchangeable for reading and writing state, so that I can mix the two seams without them diverging.", () => {

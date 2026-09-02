@@ -68,6 +68,7 @@ export { createABB6700 } from "./Domain/Controllers/createABB6700";
 export { setJointAngle } from "./Domain/Controllers/setJointAngle";
 export { setPose } from "./Domain/Controllers/setPose";
 export { getPose } from "./Domain/Controllers/getPose";
+export { applyABB6700State } from "./Domain/Controllers/applyABB6700State";
 
 // Mocks (for consumer testing)
 export { MockABB6700PM } from "./Domain/Mocks/MockABB6700PM";
