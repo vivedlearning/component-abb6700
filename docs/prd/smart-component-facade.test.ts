@@ -33,7 +33,6 @@ describe("PRD: smart-component-facade", () => {
     it("domain is fully wired immediately after construction: commands are callable and state is readable without calling `load()`", () => {
       facade.setJointAngle("j1", Angle.FromDegrees(30));
 
-      expect(facade.getPose()?.j1.degrees).toBe(30);
       expect(facade.getState().j1).toBe(30);
     });
 
@@ -78,7 +77,6 @@ describe("PRD: smart-component-facade", () => {
 
     facade.setJointAngle("j2", Angle.FromDegrees(-15));
 
-    expect(facade.getPose()?.j2.degrees).toBe(-15);
     expect(vm()?.j2.degrees).toBe(-15);
   });
 
@@ -92,13 +90,13 @@ describe("PRD: smart-component-facade", () => {
       j6: Angle.FromDegrees(6),
     });
 
-    const pose = facade.getPose();
-    expect(pose?.j1.degrees).toBe(1);
-    expect(pose?.j2.degrees).toBe(2);
-    expect(pose?.j3.degrees).toBe(3);
-    expect(pose?.j4.degrees).toBe(4);
-    expect(pose?.j5.degrees).toBe(5);
-    expect(pose?.j6.degrees).toBe(6);
+    const state = facade.getState();
+    expect(state.j1).toBe(1);
+    expect(state.j2).toBe(2);
+    expect(state.j3).toBe(3);
+    expect(state.j4).toBe(4);
+    expect(state.j5).toBe(5);
+    expect(state.j6).toBe(6);
   });
 
   it("story-8: As a slide Activity, I want `facade.getState()` to return the six joint angles in degrees tagged with the current schema version, so that I can persist the arm's authored configuration.", () => {
@@ -145,13 +143,51 @@ describe("PRD: smart-component-facade", () => {
       });
     });
 
-    it.todo(
-      "a snapshot whose version does not match is still applied — never rejected, never a no-op",
-    );
+    it("a snapshot whose version does not match is still applied — never rejected, never a no-op", () => {
+      facade.applyState({
+        version: ABB_6700_STATE_VERSION + 999,
+        j1: 11,
+        j2: 22,
+        j3: 33,
+        j4: 44,
+        j5: 55,
+        j6: 66,
+      });
 
-    it.todo(
-      "a snapshot missing a joint falls back to that joint's entity default rather than producing an invalid angle",
-    );
+      expect(facade.getState()).toEqual({
+        version: ABB_6700_STATE_VERSION,
+        j1: 11,
+        j2: 22,
+        j3: 33,
+        j4: 44,
+        j5: 55,
+        j6: 66,
+      });
+    });
+
+    it("a snapshot missing a joint falls back to that joint's entity default rather than producing an invalid angle", () => {
+      const snapshot = {
+        version: ABB_6700_STATE_VERSION,
+        j1: 11,
+        j2: 22,
+        j3: 33,
+        j5: 55,
+        j6: 66,
+      } as unknown as ABB6700State;
+
+      facade.applyState(snapshot);
+
+      expect(facade.getState()).toEqual({
+        version: ABB_6700_STATE_VERSION,
+        j1: 11,
+        j2: 22,
+        j3: 33,
+        j4: 0,
+        j5: 55,
+        j6: 66,
+      });
+      expect(Number.isNaN(facade.getState().j4)).toBe(false);
+    });
   });
 
   describe("story-10: As a slide Activity, I want `facade.onViewModel(cb)` to deliver the current view model and every subsequent change, returning an unsubscribe function, so that my UI stays in sync with the arm.", () => {
@@ -321,12 +357,48 @@ describe("PRD: smart-component-facade", () => {
   });
 
   describe("story-14: As a slide Activity, I want the facade and the standalone state controllers to be interchangeable for reading and writing state, so that I can mix the two seams without them diverging.", () => {
-    it.todo(
-      "state written through `facade.applyState` is readable through `getABB6700State`",
-    );
+    it("state written through `facade.applyState` is readable through `getABB6700State`", () => {
+      facade.applyState({
+        version: ABB_6700_STATE_VERSION,
+        j1: 11,
+        j2: 22,
+        j3: 33,
+        j4: 44,
+        j5: 55,
+        j6: 66,
+      });
 
-    it.todo(
-      "state written through `applyABB6700State` is readable through `facade.getState`",
-    );
+      expect(getABB6700State("arm-1", appObjects, ABB_6700_STATE_VERSION)).toEqual({
+        version: ABB_6700_STATE_VERSION,
+        j1: 11,
+        j2: 22,
+        j3: 33,
+        j4: 44,
+        j5: 55,
+        j6: 66,
+      });
+    });
+
+    it("state written through `applyABB6700State` is readable through `facade.getState`", () => {
+      applyABB6700State("arm-1", appObjects, {
+        version: ABB_6700_STATE_VERSION,
+        j1: 11,
+        j2: 22,
+        j3: 33,
+        j4: 44,
+        j5: 55,
+        j6: 66,
+      });
+
+      expect(facade.getState()).toEqual({
+        version: ABB_6700_STATE_VERSION,
+        j1: 11,
+        j2: 22,
+        j3: 33,
+        j4: 44,
+        j5: 55,
+        j6: 66,
+      });
+    });
   });
 });
