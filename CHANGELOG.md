@@ -2,6 +2,21 @@
 
 All notable changes to `@vived/component-ABB6700` will be documented in this file.
 
+## [2.0.1] — 2026-09-17
+
+### Fixed
+
+- **Arms rendered nothing after the app was remounted.** The Babylon view cached
+  its loaded `AssetContainer` in a class-static map keyed by asset ID alone. A Host
+  mounts the app more than once per page life, and each mount is a new engine and
+  scene while the module (and the cache) lives on — so the second scene's arms
+  instantiated from a container bound to the first, disposed scene. The clones
+  landed in the dead scene: the transform hierarchy existed (tooling on the EOT
+  socket still showed, correctly placed) but no arm geometry drew. The cache is now
+  scene-scoped and in-flight-deduplicated (`ABB6700AssetCache.ts`), the same shape
+  every other VIVED smart component already uses. The four arms of one cell now
+  share one GLB load instead of four parallel ones.
+
 ## [2.0.0] — 2026-09-02
 
 ### BREAKING CHANGES
