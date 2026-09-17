@@ -1,17 +1,11 @@
 import "@babylonjs/loaders/glTF";
 import { AppObject, AppObjectView } from "@vived/core";
-import {
-  AbstractMesh,
-  AssetContainer,
-  LoadAssetContainerAsync,
-  Scene,
-  TransformNode,
-  type Node,
-} from "@babylonjs/core";
-import { BabylonEntity, getAssetBlobURL } from "@vived/app";
+import { AbstractMesh, Scene, TransformNode, type Node } from "@babylonjs/core";
+import { BabylonEntity } from "@vived/app";
 import { ABB6700VM } from "../../Domain/PMs/ABB6700PM";
 import { aBB6700PMAdapter } from "../../Domain/Adapters/aBB6700PMAdapter";
 import componentConfig from "../../component.config";
+import { getABB6700AssetContainer } from "./ABB6700AssetCache";
 
 export type { ABB6700Joint } from "../../Domain/UCs/SetJointAngleUC";
 
@@ -76,8 +70,6 @@ export async function makeABB6700BabylonView(
 }
 
 class ABB6700BabylonViewImp extends ABB6700BabylonView {
-  private static containerCache = new Map<string, AssetContainer>();
-
   private lastVM: ABB6700VM | undefined;
   private instantiatedEntries?: { dispose(): void };
 
@@ -134,14 +126,14 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
     // Dispose previous instance if load is called again
     this.instantiatedEntries?.dispose();
 
-    let container = ABB6700BabylonViewImp.containerCache.get(asset.id);
-    if (!container) {
-      const blobURL = await getAssetBlobURL(asset.id, this.appObjects);
-      container = await LoadAssetContainerAsync(blobURL, scene, {
-        pluginExtension: ".glb",
-      });
-      ABB6700BabylonViewImp.containerCache.set(asset.id, container);
-    }
+    // Scene-scoped and deduplicated: the four arms of a cell share one GLB
+    // load, and a remounted app (new scene) never receives a container from
+    // the previous scene.
+    const container = await getABB6700AssetContainer(
+      scene,
+      this.appObjects,
+      asset.id,
+    );
 
     const entries = container.instantiateModelsToScene((name) => name);
     this.instantiatedEntries = entries;
