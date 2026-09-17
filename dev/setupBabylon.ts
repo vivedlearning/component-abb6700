@@ -45,9 +45,13 @@ export function setupBabylon(
   );
   mainLight.intensity = 0.6;
 
-  // Register the scene on BabylonEntity so components can resolve it
+  // Register the scene on BabylonEntity so components can resolve it. On a
+  // remount the entity already exists and only its scene and engine change,
+  // which is exactly what a Host does when it mounts the app again.
   const babylonAppObject = appObjects.getOrCreate("BabylonEntity");
-  const babylonEntity = makeBabylonEntity(babylonAppObject);
+  const babylonEntity =
+    babylonAppObject.getComponent<BabylonEntity>(BabylonEntity.type) ??
+    makeBabylonEntity(babylonAppObject);
   babylonEntity.scene = scene;
   babylonEntity.engine = engine;
 
