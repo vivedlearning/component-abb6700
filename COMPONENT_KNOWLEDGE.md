@@ -5,7 +5,7 @@
 The ABB 6700 is a 6-axis industrial robot arm smart component. It provides a fully rigged 3D model with 6 degrees of freedom (joints J1–J6) and an automatically-computed stabilizer linkage. Developers can set individual joint angles or full poses through simple controller functions. Use this component when your slide app needs an articulated robot arm for industrial simulation, robotics education, or manufacturing visualization.
 
 - **Package**: `@vived/component-abb-6700`
-- **Version**: 2.0.0
+- **Version**: 2.0.1
 - **Interface version**: 1 (`SmartComponent` contract implemented by `ABB6700Facade`)
 - **GitHub**: `vivedlearning/component-abb6700`
 
@@ -145,6 +145,8 @@ The ABB 6700 emits no events. `onEvent` exists only to satisfy the contract and 
 
 `getState()` / `applyState()` capture the authored configuration: `version` plus the six joint angles **in degrees**. The state schema `version` starts at `1` (`ABB_6700_STATE_VERSION`). `applyState` is **best-effort forward-compatible** (ADR-0005, superseding ADR-0003) — a snapshot is always applied, whatever its `version`: never rejected, never a no-op. Each joint is resolved independently; a joint the snapshot omits falls back to that joint's entity default rather than producing an invalid angle. Derived stabilizer state is not stored; it is recomputed from J2 on apply.
 
+The facade's `getState`/`applyState` are one-line delegations to the standalone `getABB6700State` / `applyABB6700State` controllers, which take and restore the same snapshot without a facade, so the two seams cannot drift.
+
 ### Variants & objectId interaction map
 
 `load(variant?)` accepts an optional variant string; an omitted or unrecognized variant loads the default asset. Any GLB honoring the objectId interaction map can serve as a variant. The map: `joint_1`–`joint_6` (revolute joints), `stabilizer_joint_1` (stabilizer rotation), `stabilizer_joint_2` (stabilizer prismatic extension), `eot` (end-of-arm tooling mount).
@@ -165,7 +167,7 @@ For Host integration, prefer `ABB6700Facade`. `createBabylonABB6700` remains the
 | `setJointAngle`             | `(id: string, joint: ABB6700Joint, angle: Angle, appObjects: AppObjectRepo) → void` | Set a single joint angle.                                                       |
 | `setPose`                   | `(id: string, pose: ABB6700Pose, appObjects: AppObjectRepo) → void`                 | Set all 6 joints at once.                                                       |
 | `getPose`                   | `(id: string, appObjects: AppObjectRepo) → ABB6700Pose \| undefined`                | Read the current pose.                                                          |
-| `getABB6700State`           | `(id: string, appObjects: AppObjectRepo, version: number) → ABB6700State`           | Snapshot the authored configuration without a facade. An unknown id resolves to the default state rather than throwing. |
+| `getABB6700State`           | `(id: string, appObjects: AppObjectRepo, version: number) → ABB6700State`           | Snapshot the authored configuration without a facade. An unknown id submits a warning and resolves to the default state rather than throwing. |
 | `applyABB6700State`         | `(id: string, appObjects: AppObjectRepo, state: ABB6700State) → void`               | Restore a saved snapshot without a facade. Best-effort forward-compatible (ADR-0005); an unknown id submits a warning and leaves the domain untouched. |
 | `makeABB6700FeatureFactory` | `(appObjects: AppObjectRepo) → ABB6700FeatureFactory`                               | Register the feature factory during domain setup.                               |
 | `aBB6700PMAdapter`          | `PmAdapter<ABB6700VM>`                                                              | Subscribe/unsubscribe to view model changes for custom UI.                      |
@@ -306,6 +308,8 @@ const saved = robot.getState();
 // ...later, or in a fresh session after re-creating the facade...
 robot.applyState(saved); // safe to call before load()
 ```
+
+Both methods delegate to the standalone `getABB6700State` / `applyABB6700State` controllers, which take and restore the same snapshot without a facade.
 
 ### Mount the robot in a host scene
 
@@ -449,7 +453,7 @@ The stabilizer connecting J1 and J2 is computed automatically — developers do 
 | -------------- | --------------------------------- |
 | Package              | `@vived/component-abb-6700`       |
 | GitHub               | `vivedlearning/component-abb6700` |
-| Version              | 2.0.0                             |
+| Version              | 2.0.1                             |
 | Interface version    | 1                                 |
 | State schema version | 1 (`ABB6700State.version`)        |
 | Multi-instance       | Yes                               |
@@ -470,7 +474,8 @@ The stabilizer connecting J1 and J2 is computed automatically — developers do 
 | Category | Exports                                                            |
 | -------- | ------------------------------------------------------------------ |
 | View     | `ABB6700BabylonView` (`.get()`), `ABB6700_WHOLE_ARM_HIGHLIGHT_GROUP`               |
-| Types    | `ABB6700Pose`, `ABB6700Joint`, `ABB6700VM`, `ABB6700State`, `ABB6700EntityFactory`, `SmartComponent` |
+| Types    | `ABB6700Pose`, `ABB6700Joint`, `ABB6700VM`, `ABB6700State`, `ABB6700Events`, `ABB6700EntityFactory`, `SmartComponent` |
+| Constants | `ABB_6700_STATE_VERSION` |
 
 #### Internal / Advanced (extensibility/testing only — not for normal use)
 

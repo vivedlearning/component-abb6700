@@ -2,7 +2,7 @@
 
 All notable changes to `@vived/component-ABB6700` will be documented in this file.
 
-## [2.0.1] — 2026-09-17
+## [2.0.1] — 2026-09-21
 
 ### Fixed
 
