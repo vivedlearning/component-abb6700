@@ -237,7 +237,7 @@ interface ABB6700VM {
 | -------------------------------------- | -------------- |
 | `5306be7c-5786-4e20-83ee-fe82471c5651` | `abb_6700.glb` |
 
-The GLB is loaded via the VIVED asset pipeline. An internal cache ensures multiple instances share the same loaded asset data.
+The GLB is loaded via the VIVED asset pipeline. A scene-scoped cache (`ABB6700AssetCache.ts`) ensures the instances in one Babylon scene share a single load, and that a remounted app — a new engine and scene in the same page — loads afresh instead of receiving a container bound to the previous, disposed scene.
 
 ### Exposed Transform Nodes
 

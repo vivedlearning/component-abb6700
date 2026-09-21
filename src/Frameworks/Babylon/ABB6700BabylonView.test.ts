@@ -25,14 +25,15 @@ vi.mock("@babylonjs/core", () => {
     }
   }
 
-  async function LoadAssetContainerAsync() {
-    return {
+  const LoadAssetContainerAsync = vi.fn(
+    async (_url: string, scene: unknown) => ({
+      scene,
       instantiateModelsToScene: () => ({
         rootNodes: [],
         dispose: () => {},
       }),
-    };
-  }
+    }),
+  );
 
   return { TransformNode, AbstractMesh, LoadAssetContainerAsync };
 });
@@ -49,13 +50,18 @@ vi.mock("@vived/app", () => ({
 }));
 
 // Must import AFTER vi.mock so the mock is active
-import { AbstractMesh, TransformNode } from "@babylonjs/core";
+import {
+  AbstractMesh,
+  LoadAssetContainerAsync,
+  TransformNode,
+} from "@babylonjs/core";
 import { BabylonEntity } from "@vived/app";
 import {
   ABB6700_WHOLE_ARM_HIGHLIGHT_GROUP,
   ABB6700BabylonView,
   makeABB6700BabylonView,
 } from "./ABB6700BabylonView";
+import { clearABB6700AssetCache } from "./ABB6700AssetCache";
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -121,6 +127,7 @@ describe("ABB6700BabylonView", () => {
 
   beforeEach(() => {
     appObjects = makeAppObjectRepo();
+    clearABB6700AssetCache();
   });
 
   describe("Construction", () => {
@@ -695,6 +702,51 @@ describe("ABB6700BabylonView", () => {
         stabPrismatic,
       );
       expect(view.nodesByObjectId.get("eot")).toBe(eot);
+    });
+  });
+
+  describe("asset container cache", () => {
+    async function loadArmInto(scene: object, id: string) {
+      const appObject = appObjects.getOrCreate(id);
+      makeABB6700Entity(appObject);
+      new MockABB6700PM(appObject);
+      vi.mocked(BabylonEntity.get).mockReturnValue({ scene } as never);
+      return makeABB6700BabylonView(appObject);
+    }
+
+    beforeEach(() => {
+      vi.mocked(LoadAssetContainerAsync).mockClear();
+    });
+
+    it("loads the asset into the scene being mounted into, not the scene a previous mount used", async () => {
+      // The Host mounts the app more than once per page life. Every mount is a
+      // new engine and scene, while this module (and any static cache) lives on.
+      const firstScene = { name: "scene-1" };
+      const secondScene = { name: "scene-2" };
+
+      await loadArmInto(firstScene, "arm-a");
+      await loadArmInto(secondScene, "arm-b");
+
+      const scenesLoadedInto = vi
+        .mocked(LoadAssetContainerAsync)
+        .mock.calls.map((call) => call[1]);
+      expect(scenesLoadedInto).toContain(secondScene);
+    });
+
+    it("shares one asset load across concurrent instances in the same scene", async () => {
+      const scene = { name: "scene-shared" };
+
+      await Promise.all([
+        loadArmInto(scene, "arm-1"),
+        loadArmInto(scene, "arm-2"),
+        loadArmInto(scene, "arm-3"),
+        loadArmInto(scene, "arm-4"),
+      ]);
+
+      const loadsForScene = vi
+        .mocked(LoadAssetContainerAsync)
+        .mock.calls.filter((call) => call[1] === scene);
+      expect(loadsForScene).toHaveLength(1);
     });
   });
 
