@@ -1,7 +1,11 @@
 import { describe, it, beforeEach, expect, vi } from "vitest";
-import type { AppObjectRepo } from "@vived/core";
+import { Angle, type AppObjectRepo } from "@vived/core";
 import { makeDomainForTesting } from "../../src/Domain/makeDomainForTesting";
-import { ABB6700Facade } from "../../src/ABB6700Facade";
+import {
+  ABB6700Facade,
+  ABB_6700_STATE_VERSION,
+  type ABB6700State,
+} from "../../src/ABB6700Facade";
 import { aBB6700PMAdapter } from "../../src/Domain/Adapters/aBB6700PMAdapter";
 import type { ABB6700VM } from "../../src/Domain/PMs/ABB6700PM";
 import { ABB_6700_DEFAULT_TRANSITION_DURATION_MS } from "../../src/Domain/Entities/ABB6700Entity";
@@ -139,15 +143,62 @@ describe("PRD: pose-interpolation", () => {
   });
 
   describe("story-8: As a slide Activity, I want the view model and state snapshot to report the commanded target pose immediately, so that persistence and host UI never capture a mid-transition pose.", () => {
-    it.todo(
-      "vm-reports-target: the last view model delivered during a pose command carries the target pose, never view-interpolated angles",
-    );
-    it.todo(
-      "state-reports-target: `getState()` returns the target pose while the arm is still in transition",
-    );
-    it.todo(
-      "duration-not-in-state: the transition duration is not part of `ABB6700State`",
-    );
+    it("vm-reports-target: the last view model delivered during a pose command carries the target pose, never view-interpolated angles", () => {
+      const vm = readVM();
+
+      facade.setPose({
+        j1: Angle.FromDegrees(11),
+        j2: Angle.FromDegrees(22),
+        j3: Angle.FromDegrees(33),
+        j4: Angle.FromDegrees(44),
+        j5: Angle.FromDegrees(55),
+        j6: Angle.FromDegrees(66),
+      });
+
+      expect(vm()?.j1.degrees).toBe(11);
+      expect(vm()?.j2.degrees).toBe(22);
+      expect(vm()?.j3.degrees).toBe(33);
+      expect(vm()?.j4.degrees).toBe(44);
+      expect(vm()?.j5.degrees).toBe(55);
+      expect(vm()?.j6.degrees).toBe(66);
+    });
+    it("state-reports-target: `getState()` returns the target pose while the arm is still in transition", () => {
+      facade.setPose({
+        j1: Angle.FromDegrees(11),
+        j2: Angle.FromDegrees(22),
+        j3: Angle.FromDegrees(33),
+        j4: Angle.FromDegrees(44),
+        j5: Angle.FromDegrees(55),
+        j6: Angle.FromDegrees(66),
+      });
+
+      expect(facade.getState()).toEqual({
+        version: ABB_6700_STATE_VERSION,
+        j1: 11,
+        j2: 22,
+        j3: 33,
+        j4: 44,
+        j5: 55,
+        j6: 66,
+      });
+    });
+    it("duration-not-in-state: the transition duration is not part of `ABB6700State`", () => {
+      const vm = readVM();
+
+      facade.setTransitionDuration(250);
+
+      const state = facade.getState();
+      expect(Object.keys(state).sort()).toEqual(
+        ["version", "j1", "j2", "j3", "j4", "j5", "j6"].sort(),
+      );
+
+      facade.applyState({
+        ...state,
+        transitionDurationMs: 5,
+      } as ABB6700State);
+
+      expect(vm()?.transitionDurationMs).toBe(250);
+    });
   });
 
   it.skip(
