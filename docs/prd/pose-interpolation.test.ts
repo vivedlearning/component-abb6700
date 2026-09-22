@@ -140,7 +140,7 @@ describe("PRD: pose-interpolation", () => {
 
   describe("story-8: As a slide Activity, I want the view model and state snapshot to report the commanded target pose immediately, so that persistence and host UI never capture a mid-transition pose.", () => {
     it.todo(
-      "vm-reports-target: `onViewModel` delivers the target pose when the command is issued, not the interpolated angles",
+      "vm-reports-target: the last view model delivered during a pose command carries the target pose, never view-interpolated angles",
     );
     it.todo(
       "state-reports-target: `getState()` returns the target pose while the arm is still in transition",

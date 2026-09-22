@@ -47,7 +47,7 @@ A slide Activity gets a sensible default with no configuration and can tune or d
    - a duration set before `load()` is honoured once the view attaches
 
 8. As a slide Activity, I want the view model and state snapshot to report the commanded target pose immediately, so that persistence and host UI never capture a mid-transition pose.
-   - `onViewModel` delivers the target pose when the command is issued, not the interpolated angles
+   - the last view model delivered during a pose command carries the target pose, never view-interpolated angles
    - `getState()` returns the target pose while the arm is still in transition
    - the transition duration is not part of `ABB6700State`
 
