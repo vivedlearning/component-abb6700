@@ -5,6 +5,7 @@ import { createABB6700 } from "./Domain/Controllers/createABB6700";
 import { getABB6700State } from "./Domain/Controllers/getABB6700State";
 import { setJointAngle } from "./Domain/Controllers/setJointAngle";
 import { setPose } from "./Domain/Controllers/setPose";
+import { setTransitionDuration } from "./Domain/Controllers/setTransitionDuration";
 import { ABB6700Entity } from "./Domain/Entities/ABB6700Entity";
 import type { ABB6700VM } from "./Domain/PMs/ABB6700PM";
 import type { ABB6700Joint } from "./Domain/UCs/SetJointAngleUC";
@@ -65,6 +66,10 @@ export class ABB6700Facade implements SmartComponent {
 
   setJointAngle(joint: ABB6700Joint, angle: Angle): void {
     setJointAngle(this.id, joint, angle, this.appObjects);
+  }
+
+  setTransitionDuration(ms: number): void {
+    setTransitionDuration(this.id, ms, this.appObjects);
   }
 
   getState(): ABB6700State {

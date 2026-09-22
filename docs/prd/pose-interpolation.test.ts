@@ -1,6 +1,28 @@
-import { describe, it } from "vitest";
+import { describe, it, beforeEach, expect, vi } from "vitest";
+import type { AppObjectRepo } from "@vived/core";
+import { makeDomainForTesting } from "../../src/Domain/makeDomainForTesting";
+import { ABB6700Facade } from "../../src/ABB6700Facade";
+import { aBB6700PMAdapter } from "../../src/Domain/Adapters/aBB6700PMAdapter";
+import type { ABB6700VM } from "../../src/Domain/PMs/ABB6700PM";
+import { ABB_6700_DEFAULT_TRANSITION_DURATION_MS } from "../../src/Domain/Entities/ABB6700Entity";
 
 describe("PRD: pose-interpolation", () => {
+  let appObjects: AppObjectRepo;
+  let facade: ABB6700Facade;
+
+  beforeEach(() => {
+    ({ appObjects } = makeDomainForTesting());
+    facade = new ABB6700Facade("arm-1", appObjects);
+  });
+
+  function readVM(): () => ABB6700VM | undefined {
+    let vm: ABB6700VM | undefined;
+    aBB6700PMAdapter.subscribe("arm-1", appObjects, (v) => {
+      vm = v;
+    });
+    return () => vm;
+  }
+
   // --- Story stubs ---
   // it.todo = not yet implemented · it() = done · it.skip = view-only
   // Story text must be verbatim from the PRD.
@@ -57,7 +79,14 @@ describe("PRD: pose-interpolation", () => {
   });
 
   describe("story-6: As a slide Activity, I want a sensible default transition, so that arms animate between slide poses with no configuration.", () => {
-    it.todo("default-duration: the default transition duration is 1 second");
+    it("default-duration: the default transition duration is 1 second", () => {
+      const vm = readVM();
+
+      expect(ABB_6700_DEFAULT_TRANSITION_DURATION_MS).toBe(1000);
+      expect(vm()?.transitionDurationMs).toBe(
+        ABB_6700_DEFAULT_TRANSITION_DURATION_MS,
+      );
+    });
     it.skip(
       "default-easing: the default easing is ease-in-out",
       // View-only — easing exists only in the Babylon view's per-frame update; the domain has no easing concept
@@ -69,15 +98,44 @@ describe("PRD: pose-interpolation", () => {
       "zero-disables: a duration of zero disables the transition: subsequently commanded poses are rendered immediately",
       // View-only — immediate rendering is observable only on Babylon joint nodes
     );
-    it.todo(
-      "applies-to-next: a changed duration applies to the next commanded pose; a transition already in progress keeps the duration it started with",
-    );
-    it.todo(
-      "invalid-rejected: a negative or non-finite duration is rejected with a warning and the previous duration is kept",
-    );
-    it.todo(
-      "pre-load-honoured: a duration set before `load()` is honoured once the view attaches",
-    );
+    it("applies-to-next: a changed duration applies to the next commanded pose; a transition already in progress keeps the duration it started with", () => {
+      const vm = readVM();
+      const before = vm();
+
+      facade.setTransitionDuration(250);
+
+      expect(vm()?.transitionDurationMs).toBe(250);
+      expect(vm()?.j1.degrees).toBe(before?.j1.degrees);
+      expect(vm()?.j2.degrees).toBe(before?.j2.degrees);
+      expect(vm()?.j3.degrees).toBe(before?.j3.degrees);
+      expect(vm()?.j4.degrees).toBe(before?.j4.degrees);
+      expect(vm()?.j5.degrees).toBe(before?.j5.degrees);
+      expect(vm()?.j6.degrees).toBe(before?.j6.degrees);
+    });
+    it("invalid-rejected: a negative or non-finite duration is rejected with a warning and the previous duration is kept", () => {
+      const warnSpy = vi.spyOn(appObjects, "submitWarning");
+      const vm = readVM();
+
+      facade.setTransitionDuration(250);
+
+      facade.setTransitionDuration(-1);
+      expect(vm()?.transitionDurationMs).toBe(250);
+
+      facade.setTransitionDuration(NaN);
+      expect(vm()?.transitionDurationMs).toBe(250);
+
+      facade.setTransitionDuration(Infinity);
+      expect(vm()?.transitionDurationMs).toBe(250);
+
+      expect(warnSpy).toHaveBeenCalledTimes(3);
+    });
+    it("pre-load-honoured: a duration set before `load()` is honoured once the view attaches", () => {
+      const vm = readVM();
+
+      facade.setTransitionDuration(400);
+
+      expect(vm()?.transitionDurationMs).toBe(400);
+    });
   });
 
   describe("story-8: As a slide Activity, I want the view model and state snapshot to report the commanded target pose immediately, so that persistence and host UI never capture a mid-transition pose.", () => {

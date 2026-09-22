@@ -5,6 +5,7 @@ import { makeABB6700PM } from "../PMs/ABB6700PM";
 import { makeCalcStabilizerUC } from "../UCs/CalcStabilizerUC";
 import { makeSetJointAngleUC } from "../UCs/SetJointAngleUC";
 import { makeSetPoseUC } from "../UCs/SetPoseUC";
+import { makeSetTransitionDurationUC } from "../UCs/SetTransitionDurationUC";
 
 /**
  * Per-instance factory that creates Entity + PM for each component instance
@@ -29,6 +30,7 @@ export function setupABB6700InstanceFactory(appObjects: AppObjectRepo): void {
     const entity = makeABB6700Entity(ao);
     makeSetJointAngleUC(ao);
     makeSetPoseUC(ao);
+    makeSetTransitionDurationUC(ao);
     makeCalcStabilizerUC(ao);
     makeABB6700PM(ao);
     return entity;

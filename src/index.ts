@@ -8,6 +8,7 @@
 export {
   ABB6700Entity,
   makeABB6700Entity,
+  ABB_6700_DEFAULT_TRANSITION_DURATION_MS,
 } from "./Domain/Entities/ABB6700Entity";
 export {
   ABB6700Repo,
@@ -62,11 +63,16 @@ export {
   makeSetPoseUC,
   type ABB6700Pose,
 } from "./Domain/UCs/SetPoseUC";
+export {
+  SetTransitionDurationUC,
+  makeSetTransitionDurationUC,
+} from "./Domain/UCs/SetTransitionDurationUC";
 
 // Controllers
 export { createABB6700 } from "./Domain/Controllers/createABB6700";
 export { setJointAngle } from "./Domain/Controllers/setJointAngle";
 export { setPose } from "./Domain/Controllers/setPose";
+export { setTransitionDuration } from "./Domain/Controllers/setTransitionDuration";
 export { getPose } from "./Domain/Controllers/getPose";
 export { applyABB6700State } from "./Domain/Controllers/applyABB6700State";
 export { getABB6700State } from "./Domain/Controllers/getABB6700State";
@@ -75,6 +81,7 @@ export { getABB6700State } from "./Domain/Controllers/getABB6700State";
 export { MockABB6700PM } from "./Domain/Mocks/MockABB6700PM";
 export { MockSetJointAngleUC } from "./Domain/Mocks/MockSetJointAngleUC";
 export { MockSetPoseUC } from "./Domain/Mocks/MockSetPoseUC";
+export { MockSetTransitionDurationUC } from "./Domain/Mocks/MockSetTransitionDurationUC";
 
 // Config
 export { default as componentConfig } from "./component.config";

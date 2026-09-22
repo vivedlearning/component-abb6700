@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Angle, makeAppObjectRepo } from "@vived/core";
 import { ABB6700VM } from "../../Domain/PMs/ABB6700PM";
-import { makeABB6700Entity } from "../../Domain/Entities/ABB6700Entity";
+import {
+  makeABB6700Entity,
+  ABB_6700_DEFAULT_TRANSITION_DURATION_MS,
+} from "../../Domain/Entities/ABB6700Entity";
 import { MockABB6700PM } from "../../Domain/Mocks/MockABB6700PM";
 
 // ── Babylon.js mocks ──────────────────────────────────────────────────────
@@ -116,6 +119,7 @@ function makeVM(overrides: Partial<ABB6700VM> = {}): ABB6700VM {
     j6: Angle.FromDegrees(0),
     stabilizerAngle: Angle.FromDegrees(0),
     stabilizerExtension: 0,
+    transitionDurationMs: ABB_6700_DEFAULT_TRANSITION_DURATION_MS,
     ...overrides,
   };
 }

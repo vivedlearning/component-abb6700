@@ -14,6 +14,7 @@ export interface ABB6700VM {
   j6: Angle;
   stabilizerAngle: Angle;
   stabilizerExtension: number;
+  transitionDurationMs: number;
 }
 
 /**
@@ -60,7 +61,8 @@ class ABB6700PMImp extends ABB6700PM {
       a.j5.degrees === b.j5.degrees &&
       a.j6.degrees === b.j6.degrees &&
       a.stabilizerAngle.degrees === b.stabilizerAngle.degrees &&
-      a.stabilizerExtension === b.stabilizerExtension
+      a.stabilizerExtension === b.stabilizerExtension &&
+      a.transitionDurationMs === b.transitionDurationMs
     );
   }
 
@@ -78,6 +80,7 @@ class ABB6700PMImp extends ABB6700PM {
       j6: entity.j6,
       stabilizerAngle: entity.stabilizerAngle,
       stabilizerExtension: entity.stabilizerExtension,
+      transitionDurationMs: entity.transitionDurationMs,
     };
 
     this.doUpdateView(viewModel);

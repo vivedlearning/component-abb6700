@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Angle, makeAppObjectRepo } from "@vived/core";
-import { ABB6700Entity, makeABB6700Entity } from "./ABB6700Entity";
+import {
+  ABB6700Entity,
+  makeABB6700Entity,
+  ABB_6700_DEFAULT_TRANSITION_DURATION_MS,
+} from "./ABB6700Entity";
 
 describe("ABB6700Entity", () => {
   let appObjects: ReturnType<typeof makeAppObjectRepo>;
@@ -242,6 +246,40 @@ describe("ABB6700Entity", () => {
     it("can set and get stabilizerExtension", () => {
       entity.stabilizerExtension = 0.05;
       expect(entity.stabilizerExtension).toBe(0.05);
+    });
+  });
+
+  describe("Transition Duration", () => {
+    let entity: ABB6700Entity;
+
+    beforeEach(() => {
+      const appObject = appObjects.getOrCreate("test-arm");
+      entity = makeABB6700Entity(appObject);
+    });
+
+    it("defaults to ABB_6700_DEFAULT_TRANSITION_DURATION_MS", () => {
+      expect(entity.transitionDurationMs).toBe(
+        ABB_6700_DEFAULT_TRANSITION_DURATION_MS,
+      );
+    });
+
+    it("can set and get transitionDurationMs", () => {
+      entity.transitionDurationMs = 250;
+      expect(entity.transitionDurationMs).toBe(250);
+    });
+
+    it("notifies observers when transitionDurationMs changes", () => {
+      const observer = vi.fn();
+      entity.addChangeObserver(observer);
+      entity.transitionDurationMs = 250;
+      expect(observer).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not notify observers when setting the same value", () => {
+      const observer = vi.fn();
+      entity.addChangeObserver(observer);
+      entity.transitionDurationMs = ABB_6700_DEFAULT_TRANSITION_DURATION_MS;
+      expect(observer).not.toHaveBeenCalled();
     });
   });
 });

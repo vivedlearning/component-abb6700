@@ -1,5 +1,6 @@
 import { Angle, AppObjectRepo, type PmAdapter } from "@vived/core";
 import { ABB6700PM, type ABB6700VM } from "../PMs/ABB6700PM";
+import { ABB_6700_DEFAULT_TRANSITION_DURATION_MS } from "../Entities/ABB6700Entity";
 
 /**
  * PM Adapter for ABB 6700
@@ -17,6 +18,7 @@ export const aBB6700PMAdapter: PmAdapter<ABB6700VM> = {
     j6: Angle.FromDegrees(0),
     stabilizerAngle: Angle.FromDegrees(0),
     stabilizerExtension: 0,
+    transitionDurationMs: ABB_6700_DEFAULT_TRANSITION_DURATION_MS,
   },
 
   subscribe: (
