@@ -68,6 +68,22 @@ import { clearABB6700AssetCache } from "./ABB6700AssetCache";
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
+/**
+ * A minimal Babylon Scene stand-in with the members the view now needs: a
+ * render observable it can subscribe/unsubscribe to, and an engine with a
+ * delta time (unused by these tests, which don't step the render loop).
+ */
+function makeMockScene(): never {
+  return {
+    onBeforeRenderObservable: {
+      add: vi.fn(() => ({ callback: () => {} })),
+      remove: vi.fn(() => true),
+      removeCallback: vi.fn(() => true),
+    },
+    getEngine: () => ({ getDeltaTime: () => 0 }),
+  } as never;
+}
+
 /** Access the protected `bindMeshes` method for testing */
 function callBindMeshes(
   view: ABB6700BabylonView,
@@ -141,11 +157,8 @@ describe("ABB6700BabylonView", () => {
       new MockABB6700PM(appObject);
 
       // Mock BabylonEntity to avoid load() attempting to resolve scene
-      const mockScene = {
-        /* minimal mock */
-      } as never;
       vi.mocked(BabylonEntity.get).mockReturnValue({
-        scene: mockScene,
+        scene: makeMockScene(),
       } as never);
 
       const view = await makeABB6700BabylonView(appObject);
@@ -161,11 +174,8 @@ describe("ABB6700BabylonView", () => {
       const addViewSpy = vi.spyOn(pm, "addView");
 
       // Mock BabylonEntity to avoid load() attempting to resolve scene
-      const mockScene = {
-        /* minimal mock */
-      } as never;
       vi.mocked(BabylonEntity.get).mockReturnValue({
-        scene: mockScene,
+        scene: makeMockScene(),
       } as never);
 
       await makeABB6700BabylonView(appObject);
@@ -186,11 +196,8 @@ describe("ABB6700BabylonView", () => {
       new MockABB6700PM(appObject);
 
       // Mock BabylonEntity to avoid load() attempting to resolve scene
-      const mockScene = {
-        /* minimal mock */
-      } as never;
       vi.mocked(BabylonEntity.get).mockReturnValue({
-        scene: mockScene,
+        scene: makeMockScene(),
       } as never);
 
       const view = await makeABB6700BabylonView(appObject);
@@ -206,11 +213,8 @@ describe("ABB6700BabylonView", () => {
       const pm = new MockABB6700PM(appObject);
 
       // Mock BabylonEntity to avoid load() attempting to resolve scene
-      const mockScene = {
-        /* minimal mock */
-      } as never;
       vi.mocked(BabylonEntity.get).mockReturnValue({
-        scene: mockScene,
+        scene: makeMockScene(),
       } as never);
 
       const view = await makeABB6700BabylonView(appObject);
@@ -249,11 +253,8 @@ describe("ABB6700BabylonView", () => {
       const pm = new MockABB6700PM(appObject);
 
       // Mock BabylonEntity to avoid load() attempting to resolve scene
-      const mockScene = {
-        /* minimal mock */
-      } as never;
       vi.mocked(BabylonEntity.get).mockReturnValue({
-        scene: mockScene,
+        scene: makeMockScene(),
       } as never);
 
       const view = await makeABB6700BabylonView(appObject);
@@ -273,11 +274,8 @@ describe("ABB6700BabylonView", () => {
       const pm = new MockABB6700PM(appObject);
 
       // Mock BabylonEntity to avoid load() attempting to resolve scene
-      const mockScene = {
-        /* minimal mock */
-      } as never;
       vi.mocked(BabylonEntity.get).mockReturnValue({
-        scene: mockScene,
+        scene: makeMockScene(),
       } as never);
 
       const view = await makeABB6700BabylonView(appObject);
@@ -303,11 +301,8 @@ describe("ABB6700BabylonView", () => {
       new MockABB6700PM(appObject);
 
       // Mock BabylonEntity to avoid load() attempting to resolve scene
-      const mockScene = {
-        /* minimal mock */
-      } as never;
       vi.mocked(BabylonEntity.get).mockReturnValue({
-        scene: mockScene,
+        scene: makeMockScene(),
       } as never);
 
       const view = await makeABB6700BabylonView(appObject);
@@ -333,11 +328,8 @@ describe("ABB6700BabylonView", () => {
       new MockABB6700PM(appObject);
 
       // Mock BabylonEntity to avoid load() attempting to resolve scene
-      const mockScene = {
-        /* minimal mock */
-      } as never;
       vi.mocked(BabylonEntity.get).mockReturnValue({
-        scene: mockScene,
+        scene: makeMockScene(),
       } as never);
 
       const view = await makeABB6700BabylonView(appObject);
@@ -356,11 +348,8 @@ describe("ABB6700BabylonView", () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       const pm = new MockABB6700PM(appObject);
-      const mockScene = {
-        /* minimal mock */
-      } as never;
       vi.mocked(BabylonEntity.get).mockReturnValue({
-        scene: mockScene,
+        scene: makeMockScene(),
       } as never);
       const view = await makeABB6700BabylonView(appObject);
 
@@ -379,11 +368,8 @@ describe("ABB6700BabylonView", () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       const pm = new MockABB6700PM(appObject);
-      const mockScene = {
-        /* minimal mock */
-      } as never;
       vi.mocked(BabylonEntity.get).mockReturnValue({
-        scene: mockScene,
+        scene: makeMockScene(),
       } as never);
       const view = await makeABB6700BabylonView(appObject);
 
@@ -410,11 +396,8 @@ describe("ABB6700BabylonView", () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       const pm = new MockABB6700PM(appObject);
-      const mockScene = {
-        /* minimal mock */
-      } as never;
       vi.mocked(BabylonEntity.get).mockReturnValue({
-        scene: mockScene,
+        scene: makeMockScene(),
       } as never);
       const view = await makeABB6700BabylonView(appObject);
 
@@ -433,11 +416,8 @@ describe("ABB6700BabylonView", () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       const pm = new MockABB6700PM(appObject);
-      const mockScene = {
-        /* minimal mock */
-      } as never;
       vi.mocked(BabylonEntity.get).mockReturnValue({
-        scene: mockScene,
+        scene: makeMockScene(),
       } as never);
       const view = await makeABB6700BabylonView(appObject);
 
@@ -478,11 +458,8 @@ describe("ABB6700BabylonView", () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       const pm = new MockABB6700PM(appObject);
-      const mockScene = {
-        /* minimal mock */
-      } as never;
       vi.mocked(BabylonEntity.get).mockReturnValue({
-        scene: mockScene,
+        scene: makeMockScene(),
       } as never);
       await makeABB6700BabylonView(appObject);
 
@@ -498,11 +475,8 @@ describe("ABB6700BabylonView", () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       new MockABB6700PM(appObject);
-      const mockScene = {
-        /* minimal mock */
-      } as never;
       vi.mocked(BabylonEntity.get).mockReturnValue({
-        scene: mockScene,
+        scene: makeMockScene(),
       } as never);
       const view = await makeABB6700BabylonView(appObject);
 
@@ -513,11 +487,8 @@ describe("ABB6700BabylonView", () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       new MockABB6700PM(appObject);
-      const mockScene = {
-        /* minimal mock */
-      } as never;
       vi.mocked(BabylonEntity.get).mockReturnValue({
-        scene: mockScene,
+        scene: makeMockScene(),
       } as never);
       const view = await makeABB6700BabylonView(appObject);
 
@@ -531,11 +502,8 @@ describe("ABB6700BabylonView", () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       new MockABB6700PM(appObject);
-      const mockScene = {
-        /* minimal mock */
-      } as never;
       vi.mocked(BabylonEntity.get).mockReturnValue({
-        scene: mockScene,
+        scene: makeMockScene(),
       } as never);
       const view = await makeABB6700BabylonView(appObject);
 
@@ -549,11 +517,8 @@ describe("ABB6700BabylonView", () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       new MockABB6700PM(appObject);
-      const mockScene = {
-        /* minimal mock */
-      } as never;
       vi.mocked(BabylonEntity.get).mockReturnValue({
-        scene: mockScene,
+        scene: makeMockScene(),
       } as never);
       const view = await makeABB6700BabylonView(appObject);
 
@@ -571,11 +536,8 @@ describe("ABB6700BabylonView", () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       new MockABB6700PM(appObject);
-      const mockScene = {
-        /* minimal mock */
-      } as never;
       vi.mocked(BabylonEntity.get).mockReturnValue({
-        scene: mockScene,
+        scene: makeMockScene(),
       } as never);
       const view = await makeABB6700BabylonView(appObject);
 
@@ -588,11 +550,8 @@ describe("ABB6700BabylonView", () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       new MockABB6700PM(appObject);
-      const mockScene = {
-        /* minimal mock */
-      } as never;
       vi.mocked(BabylonEntity.get).mockReturnValue({
-        scene: mockScene,
+        scene: makeMockScene(),
       } as never);
       const view = await makeABB6700BabylonView(appObject);
 
@@ -603,11 +562,8 @@ describe("ABB6700BabylonView", () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       new MockABB6700PM(appObject);
-      const mockScene = {
-        /* minimal mock */
-      } as never;
       vi.mocked(BabylonEntity.get).mockReturnValue({
-        scene: mockScene,
+        scene: makeMockScene(),
       } as never);
       const view = await makeABB6700BabylonView(appObject);
 
@@ -622,11 +578,8 @@ describe("ABB6700BabylonView", () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       new MockABB6700PM(appObject);
-      const mockScene = {
-        /* minimal mock */
-      } as never;
       vi.mocked(BabylonEntity.get).mockReturnValue({
-        scene: mockScene,
+        scene: makeMockScene(),
       } as never);
       const view = await makeABB6700BabylonView(appObject);
 
@@ -645,11 +598,8 @@ describe("ABB6700BabylonView", () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       new MockABB6700PM(appObject);
-      const mockScene = {
-        /* minimal mock */
-      } as never;
       vi.mocked(BabylonEntity.get).mockReturnValue({
-        scene: mockScene,
+        scene: makeMockScene(),
       } as never);
       const view = await makeABB6700BabylonView(appObject);
 
@@ -671,11 +621,8 @@ describe("ABB6700BabylonView", () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       new MockABB6700PM(appObject);
-      const mockScene = {
-        /* minimal mock */
-      } as never;
       vi.mocked(BabylonEntity.get).mockReturnValue({
-        scene: mockScene,
+        scene: makeMockScene(),
       } as never);
       const view = await makeABB6700BabylonView(appObject);
 
@@ -761,11 +708,8 @@ describe("ABB6700BabylonView", () => {
       const pm = new MockABB6700PM(appObject);
       const removeViewSpy = vi.spyOn(pm, "removeView");
 
-      const mockScene = {
-        /* minimal mock */
-      } as never;
       vi.mocked(BabylonEntity.get).mockReturnValue({
-        scene: mockScene,
+        scene: makeMockScene(),
       } as never);
       const view = await makeABB6700BabylonView(appObject);
       view.dispose();
@@ -777,11 +721,8 @@ describe("ABB6700BabylonView", () => {
       const appObject = appObjects.getOrCreate("arm-1");
       makeABB6700Entity(appObject);
       const pm = new MockABB6700PM(appObject);
-      const mockScene = {
-        /* minimal mock */
-      } as never;
       vi.mocked(BabylonEntity.get).mockReturnValue({
-        scene: mockScene,
+        scene: makeMockScene(),
       } as never);
       const view = await makeABB6700BabylonView(appObject);
 

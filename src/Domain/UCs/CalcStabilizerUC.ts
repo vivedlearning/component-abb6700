@@ -15,6 +15,27 @@ const REST_LENGTH = Math.sqrt(REST_DX * REST_DX + REST_DY * REST_DY);
 
 const ANGLE_OFFSET = 8.0326 * (Math.PI / 180);
 
+/**
+ * Pure stabilizer-linkage math: given J2, returns the stabilizer's rotation
+ * angle and prismatic extension. Extracted so the view can derive the
+ * stabilizer from an interpolated J2 during a pose transition, using the
+ * exact same math the domain uses.
+ */
+export function calcStabilizer(j2: Angle): { angle: Angle; extension: number } {
+  const currentJ2 = j2.radians;
+  const cosT = Math.cos(currentJ2);
+  const sinT = Math.sin(currentJ2);
+  const rotX = MOVING_ANCHOR.x * cosT - MOVING_ANCHOR.y * sinT;
+  const rotY = MOVING_ANCHOR.x * sinT + MOVING_ANCHOR.y * cosT;
+  const dx = J1_TO_J2.x + rotX - FIXED_ANCHOR.x;
+  const dy = J1_TO_J2.y + rotY - FIXED_ANCHOR.y;
+
+  return {
+    angle: Angle.FromRadians(Math.atan2(dy, dx) - REST_ANGLE + ANGLE_OFFSET),
+    extension: REST_LENGTH - Math.sqrt(dx * dx + dy * dy),
+  };
+}
+
 export abstract class CalcStabilizerUC extends AppObjectUC {
   static readonly type = "CalcStabilizerUC";
 
@@ -42,17 +63,9 @@ class CalcStabilizerUCImp extends CalcStabilizerUC {
     if (currentJ2 === this.lastJ2Radians) return;
     this.lastJ2Radians = currentJ2;
 
-    const cosT = Math.cos(currentJ2);
-    const sinT = Math.sin(currentJ2);
-    const rotX = MOVING_ANCHOR.x * cosT - MOVING_ANCHOR.y * sinT;
-    const rotY = MOVING_ANCHOR.x * sinT + MOVING_ANCHOR.y * cosT;
-    const dx = J1_TO_J2.x + rotX - FIXED_ANCHOR.x;
-    const dy = J1_TO_J2.y + rotY - FIXED_ANCHOR.y;
-
-    entity.stabilizerAngle = Angle.FromRadians(
-      Math.atan2(dy, dx) - REST_ANGLE + ANGLE_OFFSET,
-    );
-    entity.stabilizerExtension = REST_LENGTH - Math.sqrt(dx * dx + dy * dy);
+    const result = calcStabilizer(entity.j2);
+    entity.stabilizerAngle = result.angle;
+    entity.stabilizerExtension = result.extension;
   };
 
   dispose = (): void => {

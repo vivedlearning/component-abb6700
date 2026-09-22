@@ -1,11 +1,37 @@
 import "@babylonjs/loaders/glTF";
-import { AppObject, AppObjectView } from "@vived/core";
-import { AbstractMesh, Scene, TransformNode, type Node } from "@babylonjs/core";
+import { AppObject, AppObjectView, Angle } from "@vived/core";
+import {
+  AbstractMesh,
+  Scene,
+  TransformNode,
+  type Node,
+  type Observer,
+} from "@babylonjs/core";
 import { BabylonEntity } from "@vived/app";
 import { ABB6700VM } from "../../Domain/PMs/ABB6700PM";
 import { aBB6700PMAdapter } from "../../Domain/Adapters/aBB6700PMAdapter";
 import componentConfig from "../../component.config";
 import { getABB6700AssetContainer } from "./ABB6700AssetCache";
+import { calcStabilizer } from "../../Domain/UCs/CalcStabilizerUC";
+
+/** Six joint angles in radians, indexed j1..j6. */
+type Pose = [number, number, number, number, number, number];
+
+interface Transition {
+  from: Pose;
+  to: Pose;
+  durationMs: number;
+  elapsedMs: number;
+}
+
+function posesEqual(a: Pose, b: Pose): boolean {
+  return a.every((v, i) => v === b[i]);
+}
+
+/** Ease-in-out: smoothstep. */
+function smoothstep(t: number): number {
+  return t * t * (3 - 2 * t);
+}
 
 export type { ABB6700Joint } from "../../Domain/UCs/SetJointAngleUC";
 
@@ -73,6 +99,12 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
   private lastVM: ABB6700VM | undefined;
   private instantiatedEntries?: { dispose(): void };
 
+  /** The pose currently written to the nodes, or undefined before the first render. */
+  private rendered: Pose | undefined;
+  private transition: Transition | undefined;
+  private scene: Scene | undefined;
+  private renderObserver: Observer<Scene> | null = null;
+
   private j1Node: TransformNode | undefined;
   private j2Node: TransformNode | undefined;
   private j3Node: TransformNode | undefined;
@@ -125,6 +157,14 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
 
     // Dispose previous instance if load is called again
     this.instantiatedEntries?.dispose();
+
+    // A Host remount hands the view a fresh scene each time: detach the
+    // render observer from the previous scene before attaching to the new
+    // one, so a stale scene never keeps ticking this view.
+    this.scene?.onBeforeRenderObservable?.remove(this.renderObserver);
+    this.scene = scene;
+    this.renderObserver =
+      scene.onBeforeRenderObservable?.add(this.onBeforeRender) ?? null;
 
     // Scene-scoped and deduplicated: the four arms of a cell share one GLB
     // load, and a remounted app (new scene) never receives a container from
@@ -241,6 +281,11 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
       }
     }
 
+    // A rebind (remount) must snap: forget whatever pose was rendered on the
+    // previous nodes and any transition in flight.
+    this.rendered = undefined;
+    this.transition = undefined;
+
     // Apply current state to the newly bound meshes
     if (this.lastVM) {
       this.applyView(this.lastVM);
@@ -256,21 +301,108 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
     return node.name.toLowerCase();
   }
 
+  private writeJoints(pose: Pose): void {
+    if (this.j1Node) this.j1Node.rotation.z = pose[0];
+    if (this.j2Node) this.j2Node.rotation.z = pose[1];
+    if (this.j3Node) this.j3Node.rotation.z = pose[2];
+    if (this.j4Node) this.j4Node.rotation.z = pose[3];
+    if (this.j5Node) this.j5Node.rotation.z = pose[4];
+    if (this.j6Node) this.j6Node.rotation.z = pose[5];
+  }
+
+  private writeStabilizer(angleRadians: number, extension: number): void {
+    if (this.stabilizerRotationNode)
+      this.stabilizerRotationNode.rotation.z = angleRadians;
+    if (this.stabilizerPrismaticNode)
+      this.stabilizerPrismaticNode.position.z = extension;
+  }
+
+  /** Write a pose directly to the nodes with no transition. */
+  private snapTo(target: Pose, vm: ABB6700VM): void {
+    this.writeJoints(target);
+    this.writeStabilizer(vm.stabilizerAngle.radians, vm.stabilizerExtension);
+    this.rendered = target;
+    this.transition = undefined;
+  }
+
   private applyView = (vm: ABB6700VM): void => {
     this.lastVM = vm;
-    if (this.j1Node) this.j1Node.rotation.z = vm.j1.radians;
-    if (this.j2Node) this.j2Node.rotation.z = vm.j2.radians;
-    if (this.j3Node) this.j3Node.rotation.z = vm.j3.radians;
-    if (this.j4Node) this.j4Node.rotation.z = vm.j4.radians;
-    if (this.j5Node) this.j5Node.rotation.z = vm.j5.radians;
-    if (this.j6Node) this.j6Node.rotation.z = vm.j6.radians;
-    if (this.stabilizerRotationNode)
-      this.stabilizerRotationNode.rotation.z = vm.stabilizerAngle.radians;
-    if (this.stabilizerPrismaticNode)
-      this.stabilizerPrismaticNode.position.z = vm.stabilizerExtension;
+    const target: Pose = [
+      vm.j1.radians,
+      vm.j2.radians,
+      vm.j3.radians,
+      vm.j4.radians,
+      vm.j5.radians,
+      vm.j6.radians,
+    ];
+
+    // Nothing rendered yet (first VM, or a fresh bindMeshes): appear
+    // directly in the commanded pose.
+    if (!this.rendered) {
+      this.snapTo(target, vm);
+      return;
+    }
+
+    // A VM whose joints match the current goal (the in-flight target, or
+    // the rendered pose if nothing is in flight) is duration-only: it must
+    // not retarget or re-time a transition.
+    const currentGoal = this.transition?.to ?? this.rendered;
+    if (posesEqual(target, currentGoal)) {
+      return;
+    }
+
+    if (vm.transitionDurationMs <= 0) {
+      this.snapTo(target, vm);
+      return;
+    }
+
+    // Start (or redirect) a transition from the currently rendered angles.
+    // Node writes happen on the next frame, not on the command itself.
+    this.transition = {
+      from: this.rendered,
+      to: target,
+      durationMs: vm.transitionDurationMs,
+      elapsedMs: 0,
+    };
+  };
+
+  /** Per-frame render-loop step: advances the in-flight transition, if any. */
+  private onBeforeRender = (): void => {
+    const transition = this.transition;
+    if (!transition) return;
+
+    const deltaMs = this.scene?.getEngine().getDeltaTime() ?? 0;
+    transition.elapsedMs += deltaMs;
+    const t = Math.min(1, transition.elapsedMs / transition.durationMs);
+    const eased = smoothstep(t);
+
+    const interpolated = transition.from.map(
+      (from, i) => from + (transition.to[i] - from) * eased,
+    ) as Pose;
+    this.writeJoints(interpolated);
+    const stab = calcStabilizer(Angle.FromRadians(interpolated[1]));
+    this.writeStabilizer(stab.angle.radians, stab.extension);
+
+    if (t >= 1) {
+      // Arrive exactly: write the target verbatim, no float residue.
+      this.writeJoints(transition.to);
+      if (this.lastVM) {
+        this.writeStabilizer(
+          this.lastVM.stabilizerAngle.radians,
+          this.lastVM.stabilizerExtension,
+        );
+      }
+      this.rendered = transition.to;
+      this.transition = undefined;
+    } else {
+      this.rendered = interpolated;
+    }
   };
 
   dispose(): void {
+    this.scene?.onBeforeRenderObservable?.remove(this.renderObserver);
+    this.renderObserver = null;
+    this.transition = undefined;
     this.instantiatedEntries?.dispose();
     this._shadowCasters = [];
     this._nodesByObjectId = new Map<string, Node>();
