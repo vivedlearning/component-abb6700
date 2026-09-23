@@ -6,6 +6,7 @@ import {
   createBabylonABB6700,
   makeABB6700FeatureFactory,
   setPose,
+  type ABB6700TransitionOption,
 } from "../src";
 import { makeDevGetAssetBlobURLUC } from "./DevGetAssetBlobURLUC";
 import { setupBabylon } from "./setupBabylon";
@@ -120,7 +121,10 @@ function renderOnce() {
  */
 type PoseDegrees = { j1: number; j2: number; j3: number; j4: number; j5: number; j6: number };
 
-function setPoseDegrees(deg: PoseDegrees): void {
+function setPoseDegrees(
+  deg: PoseDegrees,
+  options?: ABB6700TransitionOption,
+): void {
   setPose(
     INSTANCE_ID,
     {
@@ -132,6 +136,7 @@ function setPoseDegrees(deg: PoseDegrees): void {
       j6: Angle.FromDegrees(deg.j6),
     },
     appObjects,
+    options,
   );
 }
 
