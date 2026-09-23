@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Angle, makeAppObjectRepo } from "@vived/core";
-import { ABB6700Entity, makeABB6700Entity } from "../Entities/ABB6700Entity";
+import {
+  ABB6700Entity,
+  makeABB6700Entity,
+  ABB_6700_DEFAULT_TRANSITION_DURATION_MS,
+} from "../Entities/ABB6700Entity";
 import { ABB6700PM, ABB6700VM, makeABB6700PM } from "./ABB6700PM";
 
 describe("ABB6700PM", () => {
@@ -128,6 +132,14 @@ describe("ABB6700PM", () => {
       expect(lastVM.j5.degrees).toBe(50);
       expect(lastVM.j6.degrees).toBe(60);
     });
+
+    it("copies the entity transitionDurationMs into the VM", () => {
+      entity.transitionDurationMs = 250;
+
+      expect(viewObserver).toHaveBeenCalledOnce();
+      const vm = viewObserver.mock.calls[0][0] as ABB6700VM;
+      expect(vm.transitionDurationMs).toBe(250);
+    });
   });
 
   describe("VM Comparison Logic", () => {
@@ -149,6 +161,7 @@ describe("ABB6700PM", () => {
         j6: Angle.FromDegrees(60),
         stabilizerAngle: Angle.FromDegrees(5),
         stabilizerExtension: 0.01,
+        transitionDurationMs: ABB_6700_DEFAULT_TRANSITION_DURATION_MS,
       };
       const vm2: ABB6700VM = {
         j1: Angle.FromDegrees(10),
@@ -159,6 +172,7 @@ describe("ABB6700PM", () => {
         j6: Angle.FromDegrees(60),
         stabilizerAngle: Angle.FromDegrees(5),
         stabilizerExtension: 0.01,
+        transitionDurationMs: ABB_6700_DEFAULT_TRANSITION_DURATION_MS,
       };
 
       expect(pm.vmsAreEqual(vm1, vm2)).toBe(true);
@@ -174,6 +188,7 @@ describe("ABB6700PM", () => {
         j6: Angle.FromDegrees(0),
         stabilizerAngle: Angle.FromDegrees(0),
         stabilizerExtension: 0,
+        transitionDurationMs: ABB_6700_DEFAULT_TRANSITION_DURATION_MS,
       };
       const vm2: ABB6700VM = {
         j1: Angle.FromDegrees(20),
@@ -184,6 +199,27 @@ describe("ABB6700PM", () => {
         j6: Angle.FromDegrees(0),
         stabilizerAngle: Angle.FromDegrees(0),
         stabilizerExtension: 0,
+        transitionDurationMs: ABB_6700_DEFAULT_TRANSITION_DURATION_MS,
+      };
+
+      expect(pm.vmsAreEqual(vm1, vm2)).toBe(false);
+    });
+
+    it("considers VMs with different transitionDurationMs as not equal", () => {
+      const vm1: ABB6700VM = {
+        j1: Angle.FromDegrees(0),
+        j2: Angle.FromDegrees(0),
+        j3: Angle.FromDegrees(0),
+        j4: Angle.FromDegrees(0),
+        j5: Angle.FromDegrees(0),
+        j6: Angle.FromDegrees(0),
+        stabilizerAngle: Angle.FromDegrees(0),
+        stabilizerExtension: 0,
+        transitionDurationMs: 1000,
+      };
+      const vm2: ABB6700VM = {
+        ...vm1,
+        transitionDurationMs: 250,
       };
 
       expect(pm.vmsAreEqual(vm1, vm2)).toBe(false);

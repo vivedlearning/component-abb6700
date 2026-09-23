@@ -1,9 +1,11 @@
 import "@babylonjs/inspector";
-import { makeAppObjectRepo, makeDomainFactoryRepo } from "@vived/core";
+import { Angle, makeAppObjectRepo, makeDomainFactoryRepo } from "@vived/core";
+import type { TransformNode } from "@babylonjs/core";
 import {
   ABB6700BabylonView,
   createBabylonABB6700,
   makeABB6700FeatureFactory,
+  setPose,
 } from "../src";
 import { makeDevGetAssetBlobURLUC } from "./DevGetAssetBlobURLUC";
 import { setupBabylon } from "./setupBabylon";
@@ -112,14 +114,60 @@ function renderOnce() {
   return renderStats();
 }
 
+/**
+ * Dev-only: command a pose in degrees, and read back what the view has
+ * actually written to the joint nodes (the rendered pose, not the target).
+ */
+type PoseDegrees = { j1: number; j2: number; j3: number; j4: number; j5: number; j6: number };
+
+function setPoseDegrees(deg: PoseDegrees): void {
+  setPose(
+    INSTANCE_ID,
+    {
+      j1: Angle.FromDegrees(deg.j1),
+      j2: Angle.FromDegrees(deg.j2),
+      j3: Angle.FromDegrees(deg.j3),
+      j4: Angle.FromDegrees(deg.j4),
+      j5: Angle.FromDegrees(deg.j5),
+      j6: Angle.FromDegrees(deg.j6),
+    },
+    appObjects,
+  );
+}
+
+function renderedJointDegrees(): PoseDegrees & { frameId: number } {
+  const view = ABB6700BabylonView.get(instanceAO!);
+  const z = (id: string): number => {
+    const node = view?.nodesByObjectId.get(id) as TransformNode | undefined;
+    return ((node?.rotation.z ?? NaN) * 180) / Math.PI;
+  };
+  return {
+    j1: z("joint_1"),
+    j2: z("joint_2"),
+    j3: z("joint_3"),
+    j4: z("joint_4"),
+    j5: z("joint_5"),
+    j6: z("joint_6"),
+    frameId: engine.frameId,
+  };
+}
+
 declare global {
   interface Window {
     __abb6700Playground: {
       remount: typeof remount;
       renderStats: typeof renderStats;
       renderOnce: typeof renderOnce;
+      setPoseDegrees: typeof setPoseDegrees;
+      renderedJointDegrees: typeof renderedJointDegrees;
     };
   }
 }
 
-window.__abb6700Playground = { remount, renderStats, renderOnce };
+window.__abb6700Playground = {
+  remount,
+  renderStats,
+  renderOnce,
+  setPoseDegrees,
+  renderedJointDegrees,
+};

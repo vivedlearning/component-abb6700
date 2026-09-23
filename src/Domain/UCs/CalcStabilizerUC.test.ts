@@ -1,7 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Angle, makeAppObjectRepo } from "@vived/core";
 import { makeABB6700Entity, ABB6700Entity } from "../Entities/ABB6700Entity";
-import { CalcStabilizerUC, makeCalcStabilizerUC } from "./CalcStabilizerUC";
+import {
+  CalcStabilizerUC,
+  calcStabilizer,
+  makeCalcStabilizerUC,
+} from "./CalcStabilizerUC";
 
 describe("CalcStabilizerUC", () => {
   let appObjects: ReturnType<typeof makeAppObjectRepo>;
@@ -42,6 +46,19 @@ describe("CalcStabilizerUC", () => {
     const appObject = appObjects.getOrCreate("test-arm");
     const uc = CalcStabilizerUC.get(appObject);
     expect(uc).toBeDefined();
+  });
+
+  it("calcStabilizer(0) matches the ANGLE_OFFSET rest state", () => {
+    const result = calcStabilizer(Angle.FromDegrees(0));
+    expect(result.angle.degrees).toBeCloseTo(8.0326, 3);
+    expect(result.extension).toBe(0);
+  });
+
+  it("the UC's entity values equal calcStabilizer(entity.j2)", () => {
+    entity.j2 = Angle.FromDegrees(30);
+    const expected = calcStabilizer(entity.j2);
+    expect(entity.stabilizerAngle.radians).toBe(expected.angle.radians);
+    expect(entity.stabilizerExtension).toBe(expected.extension);
   });
 
   it("stops observing after disposal", () => {

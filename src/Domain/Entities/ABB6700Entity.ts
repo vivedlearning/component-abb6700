@@ -7,6 +7,9 @@ import {
 } from "@vived/core";
 import { ABB_6700_DEFAULT_JOINT_DEGREES } from "./ABB6700State";
 
+/** The default pose-transition duration, in milliseconds, for a new instance. */
+export const ABB_6700_DEFAULT_TRANSITION_DURATION_MS = 1000;
+
 /**
  * ABB 6700 Entity
  *
@@ -40,6 +43,10 @@ export abstract class ABB6700Entity extends AppObjectEntity {
 
   abstract get stabilizerExtension(): number;
   abstract set stabilizerExtension(val: number);
+
+  /** The duration, in milliseconds, a commanded pose transitions over. */
+  abstract get transitionDurationMs(): number;
+  abstract set transitionDurationMs(val: number);
 
   static get(appObj: AppObject): ABB6700Entity | undefined {
     return appObj.getComponent<ABB6700Entity>(this.type);
@@ -99,6 +106,7 @@ class ABB6700EntityImp extends ABB6700Entity {
     this.notifyOnChange,
   );
   private _stabilizerExtension = 0;
+  private _transitionDurationMs = ABB_6700_DEFAULT_TRANSITION_DURATION_MS;
 
   get j1() {
     return this.memoizedJ1.val;
@@ -155,6 +163,15 @@ class ABB6700EntityImp extends ABB6700Entity {
   set stabilizerExtension(val: number) {
     if (this._stabilizerExtension === val) return;
     this._stabilizerExtension = val;
+    this.notifyOnChange();
+  }
+
+  get transitionDurationMs(): number {
+    return this._transitionDurationMs;
+  }
+  set transitionDurationMs(val: number) {
+    if (this._transitionDurationMs === val) return;
+    this._transitionDurationMs = val;
     this.notifyOnChange();
   }
 
