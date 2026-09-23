@@ -524,7 +524,7 @@ describe("ABB6700BabylonView pose transitions", () => {
   //
   // The domain emits more than one VM per command: a J2 change notifies once
   // for the joint and again for each derived stabilizer value, so the first VM
-  // carrying the new J2 can still carry the previous extension. With animation
+  // carrying the new J2 can still carry the previous extension. With transitions
   // disabled the view must not be fooled by that ordering.
 
   it("story-7 / zero-disables (real domain): a J2-only command with a zero duration leaves the stabilizer consistent with the new J2", async () => {
@@ -734,8 +734,8 @@ describe("ABB6700BabylonView pose transitions", () => {
     });
   });
 
-  describe("story-12: commands without the snap option animate as before", () => {
-    it("default-animates: an unchanged snap count still transitions", async () => {
+  describe("story-12: commands without the snap option transition as before", () => {
+    it("default-transitions: an unchanged snap count still transitions", async () => {
       const mock = makeMockScene();
       const rig = await mountInTransition(mock); // counts are 0 throughout
       mock.frame(500);
@@ -743,7 +743,7 @@ describe("ABB6700BabylonView pose transitions", () => {
       expect(p).toBeCloseTo(0.5, 6);
     });
 
-    it("animate-after-snap: an animated command after a snap transitions from the snapped pose", async () => {
+    it("transition-after-snap: a command without the snap option, issued after a snap, transitions from the snapped pose", async () => {
       const mock = makeMockScene();
       const rig = await mountArm("arm-1", mock);
       rig.pm.doUpdateView(makeVM(POSE_A));
@@ -757,7 +757,7 @@ describe("ABB6700BabylonView pose transitions", () => {
       expect(p).toBeCloseTo(0.5, 6);
     });
 
-    it("real domain: an animated command after a snap transitions", async () => {
+    it("real domain: a command without the snap option, issued after a snap, transitions", async () => {
       const mock = makeMockScene();
       const { facade, joints } = await mountRealArm(mock);
       facade.setPose(POSE_C, { transition: "none" });
@@ -842,7 +842,7 @@ describe("ABB6700BabylonView pose transitions", () => {
     expect(arm2.joints[0].rotation.z).not.toBe(POSE_B.j1.radians);
   });
 
-  it("story-16: a snap commanded before the view attaches does not make the first animated command after load snap", async () => {
+  it("story-16: a snap commanded before the view attaches does not make the first command after load snap", async () => {
     const mock = makeMockScene();
     const domain = makeDomainForTesting();
     const facade = new ABB6700Facade("arm-1", domain.appObjects);

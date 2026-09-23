@@ -12,11 +12,11 @@ export interface ABB6700Pose {
 
 /**
  * Per-command rendering option for setPose, setJointAngle and applyState.
- * Only the exact value "none" snaps; undefined, "animate", a missing object,
- * or any other value animates.
+ * Only the exact value "none" snaps; undefined, "transition", a missing object,
+ * or any other value transitions.
  */
 export type ABB6700TransitionOption = {
-  transition?: "none" | "animate";
+  transition?: "none" | "transition";
 };
 
 /**

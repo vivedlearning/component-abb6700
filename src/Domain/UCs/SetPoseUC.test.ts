@@ -68,8 +68,8 @@ describe("SetPoseUC", () => {
       expect(entity.snapCount).toBe(0);
     });
 
-    it('does not increment snapCount when transition is "animate"', () => {
-      uc.setPose(makePose(10), { transition: "animate" });
+    it('does not increment snapCount when transition is "transition"', () => {
+      uc.setPose(makePose(10), { transition: "transition" });
       expect(entity.snapCount).toBe(0);
     });
 

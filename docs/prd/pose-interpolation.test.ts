@@ -304,7 +304,7 @@ describe("PRD: pose-interpolation", () => {
 
       const poseC = { ...poseA, j3: Angle.FromDegrees(3) };
       expect(() =>
-        facade.setPose(poseC, { transition: "animate" }),
+        facade.setPose(poseC, { transition: "transition" }),
       ).not.toThrow();
       expect(vm()?.snapCount).toBe(countBefore);
       expect(vm()?.j3.degrees).toBe(3);

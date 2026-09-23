@@ -47,8 +47,8 @@ describe("SetJointAngleUC", () => {
       expect(entity.snapCount).toBe(0);
     });
 
-    it('does not increment snapCount when transition is "animate"', () => {
-      uc.setAngle("j1", Angle.FromDegrees(10), { transition: "animate" });
+    it('does not increment snapCount when transition is "transition"', () => {
+      uc.setAngle("j1", Angle.FromDegrees(10), { transition: "transition" });
       expect(entity.snapCount).toBe(0);
     });
 
