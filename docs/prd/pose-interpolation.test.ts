@@ -369,15 +369,87 @@ describe("PRD: pose-interpolation", () => {
   });
 
   describe("story-14: As a slide Activity, I want the snap option to change only how the pose is rendered, so that persistence, host UI and pacing are unaffected by it.", () => {
-    it.todo(
-      "same-committed-target: a command with the snap option commits the same target to the view model and `getState()` as the same command without it",
-    );
-    it.todo(
-      "not-in-state: the snap request is not part of `ABB6700State`",
-    );
-    it.todo(
-      "duration-untouched: a snap command leaves the transition duration unchanged, and the next animated command uses it",
-    );
+    it("same-committed-target: a command with the snap option commits the same target to the view model and `getState()` as the same command without it", () => {
+      const armOneVM = readVM();
+      const armTwoFacade = new ABB6700Facade("arm-2", appObjects);
+      let armTwoVM: ABB6700VM | undefined;
+      aBB6700PMAdapter.subscribe("arm-2", appObjects, (v) => {
+        armTwoVM = v;
+      });
+
+      const pose = {
+        j1: Angle.FromDegrees(11),
+        j2: Angle.FromDegrees(22),
+        j3: Angle.FromDegrees(33),
+        j4: Angle.FromDegrees(44),
+        j5: Angle.FromDegrees(55),
+        j6: Angle.FromDegrees(66),
+      };
+
+      facade.setPose(pose, { transition: "none" });
+      armTwoFacade.setPose(pose);
+
+      expect(armOneVM()?.j1.degrees).toBe(armTwoVM?.j1.degrees);
+      expect(armOneVM()?.j2.degrees).toBe(armTwoVM?.j2.degrees);
+      expect(armOneVM()?.j3.degrees).toBe(armTwoVM?.j3.degrees);
+      expect(armOneVM()?.j4.degrees).toBe(armTwoVM?.j4.degrees);
+      expect(armOneVM()?.j5.degrees).toBe(armTwoVM?.j5.degrees);
+      expect(armOneVM()?.j6.degrees).toBe(armTwoVM?.j6.degrees);
+      expect(armOneVM()?.stabilizerAngle.degrees).toBe(
+        armTwoVM?.stabilizerAngle.degrees,
+      );
+      expect(armOneVM()?.stabilizerExtension).toBe(
+        armTwoVM?.stabilizerExtension,
+      );
+      expect(facade.getState()).toEqual(armTwoFacade.getState());
+    });
+    it("not-in-state: the snap request is not part of `ABB6700State`", () => {
+      facade.setPose(
+        {
+          j1: Angle.FromDegrees(1),
+          j2: Angle.FromDegrees(2),
+          j3: Angle.FromDegrees(3),
+          j4: Angle.FromDegrees(4),
+          j5: Angle.FromDegrees(5),
+          j6: Angle.FromDegrees(6),
+        },
+        { transition: "none" },
+      );
+
+      expect(Object.keys(facade.getState()).sort()).toEqual(
+        ["version", "j1", "j2", "j3", "j4", "j5", "j6"].sort(),
+      );
+    });
+    it("duration-untouched: a snap command leaves the transition duration unchanged, and the next animated command uses it", () => {
+      const vm = readVM();
+
+      facade.setTransitionDuration(250);
+
+      facade.setPose(
+        {
+          j1: Angle.FromDegrees(1),
+          j2: Angle.FromDegrees(2),
+          j3: Angle.FromDegrees(3),
+          j4: Angle.FromDegrees(4),
+          j5: Angle.FromDegrees(5),
+          j6: Angle.FromDegrees(6),
+        },
+        { transition: "none" },
+      );
+
+      expect(vm()?.transitionDurationMs).toBe(250);
+
+      facade.setPose({
+        j1: Angle.FromDegrees(11),
+        j2: Angle.FromDegrees(12),
+        j3: Angle.FromDegrees(13),
+        j4: Angle.FromDegrees(14),
+        j5: Angle.FromDegrees(15),
+        j6: Angle.FromDegrees(16),
+      });
+
+      expect(vm()?.transitionDurationMs).toBe(250);
+    });
     it.skip(
       "zero-duration: with a transition duration of zero, commands render immediately whether or not the option is given",
       // View-only — immediate rendering is observable only on Babylon joint nodes
