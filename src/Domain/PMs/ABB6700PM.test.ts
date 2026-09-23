@@ -132,6 +132,14 @@ describe("ABB6700PM", () => {
       expect(lastVM.j5.degrees).toBe(50);
       expect(lastVM.j6.degrees).toBe(60);
     });
+
+    it("copies the entity transitionDurationMs into the VM", () => {
+      entity.transitionDurationMs = 250;
+
+      expect(viewObserver).toHaveBeenCalledOnce();
+      const vm = viewObserver.mock.calls[0][0] as ABB6700VM;
+      expect(vm.transitionDurationMs).toBe(250);
+    });
   });
 
   describe("VM Comparison Logic", () => {
