@@ -86,7 +86,7 @@ describe("PRD: pose-interpolation", () => {
     );
   });
 
-  describe("story-6: As a slide Activity, I want a sensible default transition, so that arms animate between slide poses with no configuration.", () => {
+  describe("story-6: As a slide Activity, I want a sensible default transition, so that arms transition between slide poses with no configuration.", () => {
     it("default-duration: the default transition duration is 1 second", () => {
       const vm = readVM();
 
@@ -101,7 +101,7 @@ describe("PRD: pose-interpolation", () => {
     );
   });
 
-  describe("story-7: As a slide Activity, I want to set the transition duration per arm instance at any time, so that I can tune the pacing or turn animation off entirely.", () => {
+  describe("story-7: As a slide Activity, I want to set the transition duration per arm instance at any time, so that I can tune the pacing or turn transitions off entirely.", () => {
     it.skip(
       "zero-disables: a duration of zero disables the transition: subsequently commanded poses are rendered immediately",
       // View-only — immediate rendering is observable only on Babylon joint nodes
@@ -206,7 +206,7 @@ describe("PRD: pose-interpolation", () => {
   });
 
   it.skip(
-    "story-9: As a slide Activity, I want `destroy()` during a transition to stop the motion cleanly, so that tearing down mid-animation never throws or writes to disposed nodes.",
+    "story-9: As a slide Activity, I want `destroy()` during a transition to stop the motion cleanly, so that tearing down mid-transition never throws or writes to disposed nodes.",
     // View-only — requires an attached Babylon view mid-transition
   );
 
@@ -215,7 +215,7 @@ describe("PRD: pose-interpolation", () => {
     // View-only — remount rebinds Babylon nodes; observable only on the view
   );
 
-  describe("story-11: As a slide Activity, I want to command a pose or a single joint with an option that snaps the arm instead of animating it, so that direct manipulation such as dragging a joint slider tracks the input exactly.", () => {
+  describe("story-11: As a slide Activity, I want to command a pose or a single joint with an option that snaps the arm instead of transitioning it, so that direct manipulation such as dragging a joint slider tracks the input exactly.", () => {
     it.skip(
       "snap-pose: `setPose` with the snap option renders the whole arm at the commanded target with no transition",
       // View-only — the snap is observable only on Babylon joint nodes
@@ -270,13 +270,13 @@ describe("PRD: pose-interpolation", () => {
     });
   });
 
-  describe("story-12: As a slide Activity, I want commands without the snap option to keep animating exactly as before, so that existing hosts and slide changes are unaffected.", () => {
+  describe("story-12: As a slide Activity, I want commands without the snap option to keep transitioning exactly as before, so that existing hosts and slide changes are unaffected.", () => {
     it.skip(
-      "default-animates: omitting the option, or passing `\"animate\"`, transitions as described in stories 1–3",
+      "default-transitions: omitting the option, or passing `\"transition\"`, transitions as described in stories 1–3",
       // View-only — transitions are observable only on Babylon joint nodes
     );
     it.skip(
-      "animate-after-snap: an animated command after a snap transitions from the snapped pose",
+      "transition-after-snap: a command without the snap option, issued after a snap, transitions from the snapped pose",
       // View-only — transitions are observable only on Babylon joint nodes
     );
     it("unrecognized: an unrecognized option value is treated as the default and does not throw", () => {
@@ -420,7 +420,7 @@ describe("PRD: pose-interpolation", () => {
         ["version", "j1", "j2", "j3", "j4", "j5", "j6"].sort(),
       );
     });
-    it("duration-untouched: a snap command leaves the transition duration unchanged, and the next animated command uses it", () => {
+    it("duration-untouched: a snap command leaves the transition duration unchanged, and the next command without the snap option uses it", () => {
       const vm = readVM();
 
       facade.setTransitionDuration(250);
@@ -462,7 +462,7 @@ describe("PRD: pose-interpolation", () => {
   );
 
   it.skip(
-    "story-16: As a slide Activity, I want a snap commanded before the view attaches to have no lasting effect, so that the first animated command after load still transitions.",
+    "story-16: As a slide Activity, I want a snap commanded before the view attaches to have no lasting effect, so that the first command after load without the snap option still transitions.",
     // View-only — requires a Babylon view attached after the command
   );
 });
