@@ -40,6 +40,8 @@ The four-bar linkage that visually connects J1 and J2 on the physical robot. Its
 
 Only J2 drives the stabilizer; the other joints do not affect it.
 
+The math lives in the pure function `calcStabilizer(j2)`, exported from `CalcStabilizerUC.ts`. The UC calls it when J2 changes; the Babylon view calls it every frame with the interpolated J2 during a **pose transition**, so the linkage stays attached mid-motion.
+
 _Avoid_: exposing a stabilizer setter or persisting stabilizer state — it is derived, not authored. `ABB6700State` deliberately omits it.
 
 ---
@@ -56,15 +58,30 @@ _Avoid_: spelling it "EOAT" or "end effector" in the API — the code and GLB us
 
 ## ABB6700Entity
 
-The per-instance source of truth. Holds `j1`–`j6` (each a `MemoizedAngle`, default 0°), plus the derived `stabilizerAngle` (`MemoizedAngle`) and `stabilizerExtension` (`number`). Setters fire `notifyOnChange`; the PM observes it and emits an immutable VM.
+The per-instance source of truth. Holds `j1`–`j6` (each a `MemoizedAngle`, default 0°), the derived `stabilizerAngle` (`MemoizedAngle`) and `stabilizerExtension` (`number`), and the `transitionDurationMs` (`number`, default 1000) the view uses for **pose transitions**. Setters fire `notifyOnChange`; the PM observes it and emits an immutable VM.
 
 ---
 
 ## ABB6700VM
 
-The immutable view model emitted by `ABB6700PM`. Carries the six joint `Angle`s plus the derived stabilizer angle and extension. Redundant emissions are suppressed via `vmsAreEqual` (degree-level comparison). Views and hosts subscribe through `aBB6700PMAdapter`.
+The immutable view model emitted by `ABB6700PM`. Carries the six joint `Angle`s, the derived stabilizer angle and extension, and `transitionDurationMs`. No VM ever carries interpolated angles. A single pose command can emit several VMs (the joints are written one at a time, and the stabilizer is derived after J2), so intermediate VMs may show a partial pose; the last VM delivered for the command carries the full commanded **target**. Redundant emissions are suppressed via `vmsAreEqual` (degree-level comparison). Views and hosts subscribe through `aBB6700PMAdapter`.
 
 _Avoid_: reading entity fields directly from a view — bind to the VM.
+
+---
+
+## Pose transition
+
+The eased motion of the rendered arm from the pose currently on screen to a newly commanded pose. It exists **only in the Babylon view**: once the command returns, the entity, the last VM delivered, and `getState()` all hold the commanded target, so persistence and host UI never see a mid-transition pose. Intermediate VMs emitted during the command can show a partial pose, but never interpolated angles.
+
+- **Transition duration** — `transitionDurationMs` on the entity, default 1000 ms (`ABB_6700_DEFAULT_TRANSITION_DURATION_MS`). Set per instance with `setTransitionDuration` (controller) or `ABB6700Facade.setTransitionDuration`, at any time, including before `load()`. Zero disables transitions. A negative or non-finite value is rejected with a warning and the previous value is kept. A change applies to the next commanded pose; a transition already in flight keeps its duration.
+- **Easing** — ease-in-out (smoothstep). The final frame writes the target exactly.
+- **Redirect** — a pose commanded mid-transition starts a new transition from the angles on screen, for the full duration. The superseded target is never visited.
+- **Snap** — no transition when the view first binds its nodes on load (it renders the current pose, including one commanded before load), after a remount or rebind, or when the duration is zero. The first pose commanded after the view has bound transitions normally.
+
+The transition duration is pacing, not **activity-authored configuration**: `ABB6700State` does not carry it.
+
+_Avoid_: calling it "animation" or "lerp" in the API, and interpolating in the domain or PM — the VM must keep reporting the target.
 
 ---
 
@@ -89,7 +106,7 @@ _Avoid_: calling this a "base class" or "interface package" — it is a shape co
 
 ## ABB6700Facade
 
-The single host-facing entry point for the ABB 6700 smart component. Implements the SmartComponent convention and adds component-specific typed commands (`setPose`, `setJointAngle`). Its read surface is `getState()` (authored configuration) and `onViewModel()` (live values) — no separate pose accessor (see ADR-0006).
+The single host-facing entry point for the ABB 6700 smart component. Implements the SmartComponent convention and adds component-specific typed commands (`setPose`, `setJointAngle`, `setTransitionDuration`). Its read surface is `getState()` (authored configuration) and `onViewModel()` (live values) — no separate pose accessor (see ADR-0006).
 
 Two-phase lifecycle (see ADR-0002):
 
