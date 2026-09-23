@@ -64,7 +64,7 @@ The per-instance source of truth. Holds `j1`–`j6` (each a `MemoizedAngle`, def
 
 ## ABB6700VM
 
-The immutable view model emitted by `ABB6700PM`. Carries the six joint `Angle`s, the derived stabilizer angle and extension, and `transitionDurationMs`. The joints are always the commanded **target**, never interpolated angles. Redundant emissions are suppressed via `vmsAreEqual` (degree-level comparison). Views and hosts subscribe through `aBB6700PMAdapter`.
+The immutable view model emitted by `ABB6700PM`. Carries the six joint `Angle`s, the derived stabilizer angle and extension, and `transitionDurationMs`. No VM ever carries interpolated angles. A single pose command can emit several VMs (the joints are written one at a time, and the stabilizer is derived after J2), so intermediate VMs may show a partial pose; the last VM delivered for the command carries the full commanded **target**. Redundant emissions are suppressed via `vmsAreEqual` (degree-level comparison). Views and hosts subscribe through `aBB6700PMAdapter`.
 
 _Avoid_: reading entity fields directly from a view — bind to the VM.
 
@@ -72,7 +72,7 @@ _Avoid_: reading entity fields directly from a view — bind to the VM.
 
 ## Pose transition
 
-The eased motion of the rendered arm from the pose currently on screen to a newly commanded pose. It exists **only in the Babylon view**: the entity, the VM, and `getState()` hold the commanded target the moment the command is issued, so persistence and host UI never see a mid-transition pose.
+The eased motion of the rendered arm from the pose currently on screen to a newly commanded pose. It exists **only in the Babylon view**: once the command returns, the entity, the last VM delivered, and `getState()` all hold the commanded target, so persistence and host UI never see a mid-transition pose. Intermediate VMs emitted during the command can show a partial pose, but never interpolated angles.
 
 - **Transition duration** — `transitionDurationMs` on the entity, default 1000 ms (`ABB_6700_DEFAULT_TRANSITION_DURATION_MS`). Set per instance with `setTransitionDuration` (controller) or `ABB6700Facade.setTransitionDuration`, at any time, including before `load()`. Zero disables transitions. A negative or non-finite value is rejected with a warning and the previous value is kept. A change applies to the next commanded pose; a transition already in flight keeps its duration.
 - **Easing** — ease-in-out (smoothstep). The final frame writes the target exactly.
