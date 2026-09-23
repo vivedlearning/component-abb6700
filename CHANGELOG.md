@@ -2,6 +2,45 @@
 
 All notable changes to `@vived/component-ABB6700` will be documented in this file.
 
+## [2.1.0] — 2026-09-23
+
+### Heads up for hosts
+
+- **Arms now move between poses instead of snapping.** With no host change, every
+  commanded pose (a slide change, `setPose`, `setJointAngle`, `applyState`) now eases
+  the rendered arm from where it is on screen to the target over 1 second. To keep
+  the old instant behaviour, call `facade.setTransitionDuration(0)` (or the
+  `setTransitionDuration` controller) after creating the arm.
+- **`ABB6700VM` has a new required field, `transitionDurationMs`.** Hosts that only
+  read view models are unaffected. Code that *builds* `ABB6700VM` literals, usually
+  consumer tests driving a view through the exported mocks, must add the field to
+  compile.
+
+### Added
+
+- **Pose transitions.** `ABB6700BabylonView` eases each commanded pose from the
+  currently rendered joint angles to the target with an ease-in-out curve, arriving
+  exactly on the commanded angles. A pose commanded mid-transition redirects from the
+  on-screen angles for the full duration. The view renders directly, with no
+  transition, when it first binds on load, after a remount, and at a zero duration. The stabilizer linkage is recomputed every frame
+  from the interpolated J2, so it stays attached throughout.
+- **Transition duration.** `setTransitionDuration(ms)` on the facade and as a
+  standalone controller (`setTransitionDuration(id, ms, appObjects)`), backed by the
+  new `SetTransitionDurationUC`. Default `1000` ms
+  (`ABB_6700_DEFAULT_TRANSITION_DURATION_MS`), per instance, settable before
+  `load()`. `0` disables transitions; a negative or non-finite value is rejected with
+  a warning and the previous duration kept. A change applies to the next pose; a
+  transition in flight keeps its duration. `MockSetTransitionDurationUC` is exported
+  for consumer tests.
+
+### Unchanged on purpose
+
+- **State and view model report the target, never a mid-transition pose.** The
+  interpolation lives only in the Babylon view. `getState()` and the last VM
+  delivered for a command always carry the commanded angles, and the duration is not
+  part of `ABB6700State` (it is pacing, not authored configuration), so the state
+  schema version stays `1`.
+
 ## [2.0.1] — 2026-09-21
 
 ### Fixed
