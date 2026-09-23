@@ -210,4 +210,80 @@ describe("PRD: pose-interpolation", () => {
     "story-10: As a slide Activity, I want a remounted view to come up directly in the current pose, so that a host remount never replays a swing.",
     // View-only — remount rebinds Babylon nodes; observable only on the view
   );
+
+  describe("story-11: As a slide Activity, I want to command a pose or a single joint with an option that snaps the arm instead of animating it, so that direct manipulation such as dragging a joint slider tracks the input exactly.", () => {
+    it.skip(
+      "snap-pose: `setPose` with the snap option renders the whole arm at the commanded target with no transition",
+      // View-only — the snap is observable only on Babylon joint nodes
+    );
+    it.skip(
+      "snap-joint: `setJointAngle` with the snap option renders the whole arm at the current target, so joints still in transition from an earlier command also land on their targets",
+      // View-only — the whole-arm snap is observable only on Babylon joint nodes
+    );
+    it.skip(
+      "cancels-in-flight: a snap command issued mid-transition ends that transition; the superseded target is never visited",
+      // View-only — transition cancellation is observable only on Babylon joint nodes
+    );
+    it.skip(
+      "same-target: a snap command whose angles equal the current target still ends any transition in flight",
+      // View-only — ending an in-flight transition is observable only on Babylon joint nodes
+    );
+    it.todo(
+      "controllers: the standalone `setPose` and `setJointAngle` controllers accept the same option as the facade methods",
+    );
+  });
+
+  describe("story-12: As a slide Activity, I want commands without the snap option to keep animating exactly as before, so that existing hosts and slide changes are unaffected.", () => {
+    it.skip(
+      "default-animates: omitting the option, or passing `\"animate\"`, transitions as described in stories 1–3",
+      // View-only — transitions are observable only on Babylon joint nodes
+    );
+    it.skip(
+      "animate-after-snap: an animated command after a snap transitions from the snapped pose",
+      // View-only — transitions are observable only on Babylon joint nodes
+    );
+    it.todo(
+      "unrecognized: an unrecognized option value is treated as the default and does not throw",
+    );
+  });
+
+  describe("story-13: As a slide Activity, I want `applyState` to accept the same option, so that I can restore a slide's authored configuration either with a transition or instantly.", () => {
+    it.skip(
+      "facade-apply: `applyState` with the snap option renders the restored pose with no transition; without it the restored pose transitions",
+      // View-only — snap versus transition on restore is observable only on Babylon joint nodes
+    );
+    it.skip(
+      "controller-apply: `applyABB6700State` accepts the same option with the same behaviour",
+      // View-only — snap versus transition on restore is observable only on Babylon joint nodes
+    );
+    it.todo(
+      "contract: `applyState` stays callable with the snapshot alone and the facade still satisfies the SmartComponent structural convention; the option extends beyond the contract v1's documented `applyState(state)` signature without breaking it",
+    );
+  });
+
+  describe("story-14: As a slide Activity, I want the snap option to change only how the pose is rendered, so that persistence, host UI and pacing are unaffected by it.", () => {
+    it.todo(
+      "same-committed-target: a command with the snap option commits the same target to the view model and `getState()` as the same command without it",
+    );
+    it.todo(
+      "not-in-state: the snap request is not part of `ABB6700State`",
+    );
+    it.todo(
+      "duration-untouched: a snap command leaves the transition duration unchanged, and the next animated command uses it",
+    );
+    it.skip(
+      "zero-duration: with a transition duration of zero, commands render immediately whether or not the option is given",
+      // View-only — immediate rendering is observable only on Babylon joint nodes
+    );
+  });
+
+  it.skip(
+    "story-15: As a Student, I want a snap on one arm to leave the other arms alone, so that authoring one robot never disturbs another mid-motion.",
+    // View-only — per-arm rendering; observable only on Babylon joint nodes
+  );
+
+  it.skip(
+    "story-16: As a slide Activity, I want a snap commanded before the view attaches to have no lasting effect, so that the first animated command after load still transitions.",
+    // View-only — requires a Babylon view attached after the command
+  );
 });
