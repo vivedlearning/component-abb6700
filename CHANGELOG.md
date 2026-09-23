@@ -2,6 +2,47 @@
 
 All notable changes to `@vived/component-ABB6700` will be documented in this file.
 
+## [2.2.0] — 2026-09-23
+
+### Added
+
+- **Per-command snap option.** `setPose`, `setJointAngle` and `applyState` on
+  `ABB6700Facade`, and the standalone `setPose`, `setJointAngle` and
+  `applyABB6700State` controllers, accept an optional
+  `{ transition: "none" | "transition" }`. `"none"` snaps the rendered arm straight
+  to the commanded target and ends any transition in flight, even when the target
+  has not changed. Leaving the option out, or passing `"transition"`, transitions
+  exactly as in 2.1.0; any other value is treated as the default. Use it for direct
+  manipulation, such as an authoring joint slider that previously trailed behind
+  the drag, while slide changes keep transitioning. The choice is per command, so
+  there is no mode to switch back. `ABB6700TransitionOption` is exported.
+
+### Heads up for hosts
+
+- **Two public types gain required members.** `ABB6700VM` has a new required
+  `snapCount` field, and the exported abstract `ABB6700Entity` gains abstract
+  `snapCount` and `requestSnap()` members. Hosts that only read view models or
+  drive the arm through the facade or controllers are unaffected. Code that
+  *builds* `ABB6700VM` literals, or subclasses `ABB6700Entity`, must add them to
+  compile. This is the same kind of change as `transitionDurationMs` in 2.1.0.
+- **`applyState(state, options?)`** goes beyond the SmartComponent contract v1's
+  documented `applyState(state)`. The extra parameter is optional, so the facade
+  still satisfies the contract.
+
+### Changed
+
+- **"Transition", not "animation".** The component's docs and API now call eased
+  pose changes *transitions*; "animate" and "animation" are reserved for keyframed
+  model animations the component may support later. The option's default value is
+  `"transition"`.
+
+### Unchanged on purpose
+
+- **The snap affects rendering only.** A snap command commits the same target to
+  the view model and `getState()` as the same command without it, leaves the
+  transition duration alone, and adds nothing to `ABB6700State`, whose schema
+  version stays `1`.
+
 ## [2.1.0] — 2026-09-23
 
 ### Heads up for hosts

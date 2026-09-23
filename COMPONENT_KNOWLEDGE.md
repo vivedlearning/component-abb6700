@@ -2,10 +2,10 @@
 
 ## Summary
 
-The ABB 6700 is a 6-axis industrial robot arm smart component. It provides a fully rigged 3D model with 6 degrees of freedom (joints J1–J6) and an automatically-computed stabilizer linkage. Developers can set individual joint angles or full poses through simple controller functions; the rendered arm eases to each new pose over a configurable transition duration. Use this component when your slide app needs an articulated robot arm for industrial simulation, robotics education, or manufacturing visualization.
+The ABB 6700 is a 6-axis industrial robot arm smart component. It provides a fully rigged 3D model with 6 degrees of freedom (joints J1–J6) and an automatically-computed stabilizer linkage. Developers can set individual joint angles or full poses through simple controller functions; the rendered arm eases to each new pose over a configurable transition duration, or snaps straight there when a command asks for it. Use this component when your slide app needs an articulated robot arm for industrial simulation, robotics education, or manufacturing visualization.
 
 - **Package**: `@vived/component-abb-6700`
-- **Version**: 2.1.0
+- **Version**: 2.2.0
 - **Interface version**: 1 (`SmartComponent` contract implemented by `ABB6700Facade`)
 - **GitHub**: `vivedlearning/component-abb6700`
 
@@ -115,7 +115,7 @@ Every facade has these eight members with this exact shape:
 | `load`             | `(variant?: string) => Promise<void>`                         | Attaches the Babylon view. The only async member.                                              |
 | `destroy`          | `() => void`                                                  | Tears down the instance and releases resources.                                                |
 | `getState`         | `() => ABB6700State`                                          | Snapshot the authored configuration.                                                           |
-| `applyState`       | `(state: ABB6700State) => void`                              | Restore a snapshot (best-effort forward-compatible).                                            |
+| `applyState`       | `(state: ABB6700State, options?: ABB6700TransitionOption) => void` | Restore a snapshot (best-effort forward-compatible). The optional `options` goes beyond contract v1's `applyState(state)` and stays structurally compatible with it. |
 
 ### Lifecycle (two-phase)
 
@@ -126,19 +126,20 @@ Every facade has these eight members with this exact shape:
 
 | Method          | Signature                                          | Description                        |
 | --------------- | -------------------------------------------------- | ---------------------------------- |
-| `setPose`       | `(pose: ABB6700Pose) => void`                      | Set all six joints atomically.     |
-| `setJointAngle` | `(joint: ABB6700Joint, angle: Angle) => void`      | Set a single joint.                |
+| `setPose`       | `(pose: ABB6700Pose, options?: ABB6700TransitionOption) => void` | Set all six joints atomically. |
+| `setJointAngle` | `(joint: ABB6700Joint, angle: Angle, options?: ABB6700TransitionOption) => void` | Set a single joint. |
 | `setTransitionDuration` | `(ms: number) => void`                     | Set how long the rendered arm takes to ease to each new pose. Default 1000; `0` disables transitions. |
 
-Commands return `void`. Pose commands are never blocked. `setTransitionDuration` rejects a negative or non-finite value with a warning and keeps the previous duration. To read state, use `getState()` or `onViewModel` — the facade has no separate pose accessor.
+Commands return `void`. Pose commands are never blocked. `setPose`, `setJointAngle` and `applyState` take an optional `{ transition: "none" | "transition" }` (see *Snap commands* below). `setTransitionDuration` rejects a negative or non-finite value with a warning and keeps the previous duration. To read state, use `getState()` or `onViewModel` — the facade has no separate pose accessor.
 
 ### Pose transitions
 
-The rendered arm does not jump to a commanded pose; the Babylon view eases it there from wherever it currently is on screen (ease-in-out, arriving exactly on the target). The transition duration is per instance and can be set at any time, including before `load()`:
+By default the rendered arm does not jump to a commanded pose; the Babylon view eases it there from wherever it currently is on screen (ease-in-out, arriving exactly on the target). The transition duration is per instance and can be set at any time, including before `load()`:
 
 - A change applies to the next commanded pose; a transition already in flight keeps the duration it started with.
 - A pose commanded mid-transition redirects from the angles on screen, for the full duration. The superseded target is never visited.
 - No transition happens when the view first binds its nodes on load (it renders the current pose, including one commanded before load), after a remount, or when the duration is `0`.
+- **Snap commands.** Pass `{ transition: "none" }` to `setPose`, `setJointAngle` or `applyState` (facade or controller) and the rendered arm lands on the commanded target at once, ending any transition in flight — even when the target has not changed. Leaving the option out, or passing `"transition"`, transitions as usual; any other value is treated as the default. Use it for direct manipulation such as a joint slider; a slide change should transition. The choice is per command, so there is no mode to switch back.
 - Interpolation exists only in the view. `getState()` and the last VM delivered for a command always report the commanded target, so persistence and host UI never capture a mid-transition pose. The duration is not part of `ABB6700State`.
 
 > **Migrating from 1.x:** `facade.getPose()` was removed in 2.0.0. Use `getState()` for the authored configuration, `onViewModel()` for live values, or the standalone `getPose` controller (see API Reference below) to read a pose without a facade.
@@ -149,7 +150,7 @@ The ABB 6700 emits no events. `onEvent` exists only to satisfy the contract and 
 
 ### Reactive view model (`ABB6700VM`)
 
-`onViewModel(cb)` emits the current VM immediately, then on every change, and returns an unsubscribe function. Fields: `j1`–`j6` (`Angle`), `stabilizerAngle` (`Angle`), `stabilizerExtension` (`number`), `transitionDurationMs` (`number`). The VM carries the commanded joint angles, never the interpolated angles the view renders mid-transition, and is distinct from the saved `ABB6700State`. A single pose command can emit several VMs (joints are written one at a time and the stabilizer is derived after J2), so intermediate VMs may show a partial pose; the last VM delivered for the command carries the full target.
+`onViewModel(cb)` emits the current VM immediately, then on every change, and returns an unsubscribe function. Fields: `j1`–`j6` (`Angle`), `stabilizerAngle` (`Angle`), `stabilizerExtension` (`number`), `transitionDurationMs` (`number`), `snapCount` (`number`, incremented by each snap command; the view snaps when it changes). The VM carries the commanded joint angles, never the interpolated angles the view renders mid-transition, and is distinct from the saved `ABB6700State`. A single pose command can emit several VMs (joints are written one at a time and the stabilizer is derived after J2), so intermediate VMs may show a partial pose; the last VM delivered for the command carries the full target.
 
 ### State snapshot (`ABB6700State`)
 
@@ -174,12 +175,12 @@ For Host integration, prefer `ABB6700Facade`. `createBabylonABB6700` remains the
 | `ABB6700Facade`             | `new (id: string, appObjects: AppObjectRepo)`                                       | **Recommended Host seam.** Headless constructor; `load()` attaches Babylon.    |
 | `createBabylonABB6700`      | `(id: string, appObjects: AppObjectRepo) → Promise<AppObject \| undefined>`         | **Primary entry point.** Create instance with full domain stack + Babylon view. |
 | `createABB6700`             | `(id: string, appObjects: AppObjectRepo) → AppObject \| undefined`                  | Create domain-only instance (no view). Use when you will attach a custom view.  |
-| `setJointAngle`             | `(id: string, joint: ABB6700Joint, angle: Angle, appObjects: AppObjectRepo) → void` | Set a single joint angle.                                                       |
-| `setPose`                   | `(id: string, pose: ABB6700Pose, appObjects: AppObjectRepo) → void`                 | Set all 6 joints at once.                                                       |
+| `setJointAngle`             | `(id: string, joint: ABB6700Joint, angle: Angle, appObjects: AppObjectRepo, options?: ABB6700TransitionOption) → void` | Set a single joint angle. `{ transition: "none" }` snaps. |
+| `setPose`                   | `(id: string, pose: ABB6700Pose, appObjects: AppObjectRepo, options?: ABB6700TransitionOption) → void` | Set all 6 joints at once. `{ transition: "none" }` snaps. |
 | `setTransitionDuration`     | `(id: string, ms: number, appObjects: AppObjectRepo) → void`                        | Set the pose transition duration in ms (`0` disables). Rejects negative or non-finite values with a warning; an unknown id submits a warning. |
 | `getPose`                   | `(id: string, appObjects: AppObjectRepo) → ABB6700Pose \| undefined`                | Read the current pose.                                                          |
 | `getABB6700State`           | `(id: string, appObjects: AppObjectRepo, version: number) → ABB6700State`           | Snapshot the authored configuration without a facade. An unknown id submits a warning and resolves to the default state rather than throwing. |
-| `applyABB6700State`         | `(id: string, appObjects: AppObjectRepo, state: ABB6700State) → void`               | Restore a saved snapshot without a facade. Best-effort forward-compatible (ADR-0005); an unknown id submits a warning and leaves the domain untouched. |
+| `applyABB6700State`         | `(id: string, appObjects: AppObjectRepo, state: ABB6700State, options?: ABB6700TransitionOption) → void` | Restore a saved snapshot without a facade. Best-effort forward-compatible (ADR-0005); an unknown id submits a warning and leaves the domain untouched. |
 | `makeABB6700FeatureFactory` | `(appObjects: AppObjectRepo) → ABB6700FeatureFactory`                               | Register the feature factory during domain setup.                               |
 | `aBB6700PMAdapter`          | `PmAdapter<ABB6700VM>`                                                              | Subscribe/unsubscribe to view model changes for custom UI.                      |
 
@@ -216,6 +217,11 @@ interface ABB6700Pose {
 /** Joint identifier */
 type ABB6700Joint = "j1" | "j2" | "j3" | "j4" | "j5" | "j6";
 
+/** Per-command rendering option (added in 2.2.0). Only "none" snaps. */
+type ABB6700TransitionOption = {
+  transition?: "none" | "transition";
+};
+
 /** Serializable facade state */
 type ABB6700State = {
   version: number;
@@ -239,6 +245,8 @@ interface ABB6700VM {
   stabilizerExtension: number;
   /** Pose transition duration the view uses, in ms (added in 2.1.0) */
   transitionDurationMs: number;
+  /** Incremented by each snap command; the view snaps when it changes (added in 2.2.0) */
+  snapCount: number;
 }
 ```
 
@@ -316,11 +324,26 @@ const facade = new ABB6700Facade("robot-1", appObjects);
 // Slower, more deliberate motion between slides
 facade.setTransitionDuration(2000);
 
-// Snap instantly, e.g. while an author drags a joint slider
+// Never transition this arm at all
 facade.setTransitionDuration(0);
 ```
 
-The duration is per instance and is not saved in `ABB6700State`, so set it wherever the host configures the arm.
+The duration is per instance and is not saved in `ABB6700State`, so set it wherever the host configures the arm. For a one-off instant move, use a snap command instead of toggling the duration.
+
+### Snap while dragging a joint slider
+
+```typescript
+// Direct manipulation: each drag tick lands exactly where the slider is
+facade.setJointAngle("j2", Angle.FromDegrees(sliderValue), { transition: "none" });
+
+// A slide change still transitions
+facade.applyState(slideState);
+
+// Restore a slide instantly, e.g. when an editor opens it
+facade.applyState(slideState, { transition: "none" });
+```
+
+The option is per command: nothing needs resetting after the drag ends. The standalone `setPose`, `setJointAngle` and `applyABB6700State` controllers take the same trailing option.
 
 ### Persist and restore authored state (facade)
 
@@ -465,7 +488,7 @@ All joints initialize to `0` degrees. The stabilizer angle and extension are com
 
 The stabilizer connecting J1 and J2 is computed automatically — developers do not need to set it. When J2 changes, the stabilizer angle and prismatic extension update to match the physical linkage geometry.
 
-The rendered arm eases to each newly commanded pose over the transition duration (see *Pose transitions*). The stabilizer is recomputed every frame from the interpolated J2, so the linkage stays attached mid-motion.
+The rendered arm eases to each newly commanded pose over the transition duration, unless the command asks for a snap (see *Pose transitions*). The stabilizer is recomputed every frame from the interpolated J2, so the linkage stays attached mid-motion.
 
 ### Known limitations
 
@@ -482,7 +505,7 @@ The rendered arm eases to each newly commanded pose over the transition duration
 | -------------- | --------------------------------- |
 | Package              | `@vived/component-abb-6700`       |
 | GitHub               | `vivedlearning/component-abb6700` |
-| Version              | 2.1.0                             |
+| Version              | 2.2.0                             |
 | Interface version    | 1                                 |
 | State schema version | 1 (`ABB6700State.version`)        |
 | Multi-instance       | Yes                               |
@@ -503,7 +526,7 @@ The rendered arm eases to each newly commanded pose over the transition duration
 | Category | Exports                                                            |
 | -------- | ------------------------------------------------------------------ |
 | View     | `ABB6700BabylonView` (`.get()`), `ABB6700_WHOLE_ARM_HIGHLIGHT_GROUP`               |
-| Types    | `ABB6700Pose`, `ABB6700Joint`, `ABB6700VM`, `ABB6700State`, `ABB6700Events`, `ABB6700EntityFactory`, `SmartComponent` |
+| Types    | `ABB6700Pose`, `ABB6700Joint`, `ABB6700TransitionOption`, `ABB6700VM`, `ABB6700State`, `ABB6700Events`, `ABB6700EntityFactory`, `SmartComponent` |
 | Constants | `ABB_6700_STATE_VERSION`, `ABB_6700_DEFAULT_TRANSITION_DURATION_MS` |
 
 #### Internal / Advanced (extensibility/testing only — not for normal use)
