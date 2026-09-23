@@ -4,7 +4,7 @@
 
 When a slide Activity commands a new pose, every ABB 6700 in the cell jumps to it in a single frame. To a Student watching, the arms cut between slides instead of moving, which reads as a glitch rather than a robot moving, and it hides the motion path an Activity author often wants the Student to see. An author cannot fix this today: the component has no notion of time between two poses, and the host has no access to the joint nodes to move them itself.
 
-Some commands are not slide changes. When an Activity author drags a joint slider, every tick commands a new angle; easing each one makes the arm trail the slider and drift in after the drag ends. Animation is right for a slide change and wrong for direct manipulation, and only the caller knows which one a command is.
+Some commands are not slide changes. When an Activity author drags a joint slider, every tick commands a new angle; easing each one makes the arm trail the slider and drift in after the drag ends. A transition is right for a slide change and wrong for direct manipulation, and only the caller knows which one a command is.
 
 ## Solution
 
