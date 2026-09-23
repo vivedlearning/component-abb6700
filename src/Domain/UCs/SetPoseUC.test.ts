@@ -89,8 +89,18 @@ describe("SetPoseUC", () => {
 
       uc.setPose(makePose(10), { transition: "none" });
 
-      // Joint writes each notify (6), then the snap increment notifies once.
-      expect(order[order.length - 1]).toBe("snap-incremented");
+      // Every joint write notifies with the old count; only the final
+      // notification, after all six joints, carries the new count. A reversed
+      // order would make the first partial-pose notification carry the snap.
+      expect(order).toEqual([
+        "joints-written",
+        "joints-written",
+        "joints-written",
+        "joints-written",
+        "joints-written",
+        "joints-written",
+        "snap-incremented",
+      ]);
       expect(entity.j1.degrees).toBe(10);
       expect(entity.snapCount).toBe(1);
     });
