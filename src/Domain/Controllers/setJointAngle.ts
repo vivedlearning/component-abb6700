@@ -1,5 +1,6 @@
 ﻿import { Angle, AppObjectRepo } from "@vived/core";
 import { SetJointAngleUC, type ABB6700Joint } from "../UCs/SetJointAngleUC";
+import type { ABB6700TransitionOption } from "../UCs/SetPoseUC";
 
 /**
  * Controller to set the angle of a specific joint on an ABB 6700 instance.
@@ -8,12 +9,14 @@ import { SetJointAngleUC, type ABB6700Joint } from "../UCs/SetJointAngleUC";
  * @param joint - Which joint to set ("j1" through "j6").
  * @param angle - The new angle value.
  * @param appObjects - The AppObject repository.
+ * @param options - Optional per-command rendering option (e.g. `{ transition: "none" }`).
  */
 export function setJointAngle(
   id: string,
   joint: ABB6700Joint,
   angle: Angle,
   appObjects: AppObjectRepo,
+  options?: ABB6700TransitionOption,
 ): void {
   const uc = SetJointAngleUC.getById(id, appObjects);
 
@@ -25,5 +28,9 @@ export function setJointAngle(
     return;
   }
 
-  uc.setAngle(joint, angle);
+  if (options) {
+    uc.setAngle(joint, angle, options);
+  } else {
+    uc.setAngle(joint, angle);
+  }
 }

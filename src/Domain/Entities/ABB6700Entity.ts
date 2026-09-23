@@ -48,6 +48,12 @@ export abstract class ABB6700Entity extends AppObjectEntity {
   abstract get transitionDurationMs(): number;
   abstract set transitionDurationMs(val: number);
 
+  /** Monotonically increasing count of snap requests. Never resets. */
+  abstract get snapCount(): number;
+
+  /** Increments snapCount and notifies observers, even if nothing else changed. */
+  abstract requestSnap(): void;
+
   static get(appObj: AppObject): ABB6700Entity | undefined {
     return appObj.getComponent<ABB6700Entity>(this.type);
   }
@@ -107,6 +113,7 @@ class ABB6700EntityImp extends ABB6700Entity {
   );
   private _stabilizerExtension = 0;
   private _transitionDurationMs = ABB_6700_DEFAULT_TRANSITION_DURATION_MS;
+  private _snapCount = 0;
 
   get j1() {
     return this.memoizedJ1.val;
@@ -172,6 +179,15 @@ class ABB6700EntityImp extends ABB6700Entity {
   set transitionDurationMs(val: number) {
     if (this._transitionDurationMs === val) return;
     this._transitionDurationMs = val;
+    this.notifyOnChange();
+  }
+
+  get snapCount(): number {
+    return this._snapCount;
+  }
+
+  requestSnap(): void {
+    this._snapCount++;
     this.notifyOnChange();
   }
 

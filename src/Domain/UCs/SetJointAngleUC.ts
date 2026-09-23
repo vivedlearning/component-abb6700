@@ -1,5 +1,6 @@
 ﻿import { Angle, AppObject, AppObjectRepo, AppObjectUC } from "@vived/core";
 import { ABB6700Entity } from "../Entities/ABB6700Entity";
+import type { ABB6700TransitionOption } from "./SetPoseUC";
 
 export type ABB6700Joint = "j1" | "j2" | "j3" | "j4" | "j5" | "j6";
 
@@ -11,7 +12,11 @@ export type ABB6700Joint = "j1" | "j2" | "j3" | "j4" | "j5" | "j6";
 export abstract class SetJointAngleUC extends AppObjectUC {
   static readonly type = "SetJointAngleUC";
 
-  abstract setAngle(joint: ABB6700Joint, angle: Angle): void;
+  abstract setAngle(
+    joint: ABB6700Joint,
+    angle: Angle,
+    options?: ABB6700TransitionOption,
+  ): void;
 
   static get(appObj: AppObject): SetJointAngleUC | undefined {
     return appObj.getComponent<SetJointAngleUC>(this.type);
@@ -34,13 +39,21 @@ class SetJointAngleUCImp extends SetJointAngleUC {
     return this.getCachedLocalComponent<ABB6700Entity>(ABB6700Entity.type);
   }
 
-  setAngle(joint: ABB6700Joint, angle: Angle): void {
+  setAngle(
+    joint: ABB6700Joint,
+    angle: Angle,
+    options?: ABB6700TransitionOption,
+  ): void {
     const entity = this.entity;
     if (!entity) {
       this.warn("Missing ABB6700Entity");
       return;
     }
     entity[joint] = angle;
+
+    if (options?.transition === "none") {
+      entity.requestSnap();
+    }
   }
 
   constructor(appObject: AppObject) {

@@ -19,6 +19,7 @@ export const aBB6700PMAdapter: PmAdapter<ABB6700VM> = {
     stabilizerAngle: Angle.FromDegrees(0),
     stabilizerExtension: 0,
     transitionDurationMs: ABB_6700_DEFAULT_TRANSITION_DURATION_MS,
+    snapCount: 0,
   },
 
   subscribe: (

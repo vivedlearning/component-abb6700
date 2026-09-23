@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Angle, AppObject, makeAppObjectRepo } from "@vived/core";
 import { makeABB6700Entity, ABB6700Entity } from "../Entities/ABB6700Entity";
 import { SetPoseUC, makeSetPoseUC, ABB6700Pose } from "./SetPoseUC";
@@ -60,5 +60,39 @@ describe("SetPoseUC", () => {
   it("returns undefined for getById when not found", () => {
     const appObjects = makeAppObjectRepo();
     expect(SetPoseUC.getById("missing", appObjects)).toBeUndefined();
+  });
+
+  describe("snap option", () => {
+    it("does not increment snapCount when no options are given", () => {
+      uc.setPose(makePose(10));
+      expect(entity.snapCount).toBe(0);
+    });
+
+    it('does not increment snapCount when transition is "animate"', () => {
+      uc.setPose(makePose(10), { transition: "animate" });
+      expect(entity.snapCount).toBe(0);
+    });
+
+    it('increments snapCount when transition is "none"', () => {
+      uc.setPose(makePose(10), { transition: "none" });
+      expect(entity.snapCount).toBe(1);
+    });
+
+    it("writes the joints before incrementing snapCount", () => {
+      const order: string[] = [];
+      const observer = vi.fn(() => {
+        order.push(
+          entity.snapCount === 0 ? "joints-written" : "snap-incremented",
+        );
+      });
+      entity.addChangeObserver(observer);
+
+      uc.setPose(makePose(10), { transition: "none" });
+
+      // Joint writes each notify (6), then the snap increment notifies once.
+      expect(order[order.length - 1]).toBe("snap-incremented");
+      expect(entity.j1.degrees).toBe(10);
+      expect(entity.snapCount).toBe(1);
+    });
   });
 });

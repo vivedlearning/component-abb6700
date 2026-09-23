@@ -89,4 +89,15 @@ describe("applyABB6700State controller", () => {
     );
     expect(mockUC.setPose).not.toHaveBeenCalled();
   });
+
+  it("passes the options through to the UC's setPose", () => {
+    applyABB6700State("arm-1", appObjects, makeState(), {
+      transition: "none",
+    });
+
+    expect(mockUC.setPose).toHaveBeenCalledTimes(1);
+    const options = (mockUC.setPose as ReturnType<typeof vi.fn>).mock
+      .calls[0][1];
+    expect(options).toEqual({ transition: "none" });
+  });
 });

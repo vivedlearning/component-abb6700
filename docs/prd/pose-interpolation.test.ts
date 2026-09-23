@@ -9,6 +9,10 @@ import {
 import { aBB6700PMAdapter } from "../../src/Domain/Adapters/aBB6700PMAdapter";
 import type { ABB6700VM } from "../../src/Domain/PMs/ABB6700PM";
 import { ABB_6700_DEFAULT_TRANSITION_DURATION_MS } from "../../src/Domain/Entities/ABB6700Entity";
+import { setPose } from "../../src/Domain/Controllers/setPose";
+import { setJointAngle } from "../../src/Domain/Controllers/setJointAngle";
+import { applyABB6700State } from "../../src/Domain/Controllers/applyABB6700State";
+import type { SmartComponent } from "../../src/SmartComponent";
 
 describe("PRD: pose-interpolation", () => {
   let appObjects: AppObjectRepo;
@@ -228,9 +232,42 @@ describe("PRD: pose-interpolation", () => {
       "same-target: a snap command whose angles equal the current target still ends any transition in flight",
       // View-only — ending an in-flight transition is observable only on Babylon joint nodes
     );
-    it.todo(
-      "controllers: the standalone `setPose` and `setJointAngle` controllers accept the same option as the facade methods",
-    );
+    it("controllers: the standalone `setPose` and `setJointAngle` controllers accept the same option as the facade methods", () => {
+      const armOneVM = readVM();
+      const armTwoFacade = new ABB6700Facade("arm-2", appObjects);
+      let armTwoVM: ABB6700VM | undefined;
+      aBB6700PMAdapter.subscribe("arm-2", appObjects, (v) => {
+        armTwoVM = v;
+      });
+
+      const pose = {
+        j1: Angle.FromDegrees(1),
+        j2: Angle.FromDegrees(2),
+        j3: Angle.FromDegrees(3),
+        j4: Angle.FromDegrees(4),
+        j5: Angle.FromDegrees(5),
+        j6: Angle.FromDegrees(6),
+      };
+
+      setPose("arm-1", pose, appObjects, { transition: "none" });
+      armTwoFacade.setPose(pose, { transition: "none" });
+
+      expect(armOneVM()?.snapCount).toBe(1);
+      expect(armTwoVM?.snapCount).toBe(1);
+      expect(armOneVM()?.j1.degrees).toBe(1);
+      expect(armOneVM()?.j6.degrees).toBe(6);
+      expect(armTwoVM?.j1.degrees).toBe(1);
+      expect(armTwoVM?.j6.degrees).toBe(6);
+
+      const angle = Angle.FromDegrees(99);
+      setJointAngle("arm-1", "j3", angle, appObjects, { transition: "none" });
+      armTwoFacade.setJointAngle("j3", angle, { transition: "none" });
+
+      expect(armOneVM()?.snapCount).toBe(2);
+      expect(armTwoVM?.snapCount).toBe(2);
+      expect(armOneVM()?.j3.degrees).toBe(99);
+      expect(armTwoVM?.j3.degrees).toBe(99);
+    });
   });
 
   describe("story-12: As a slide Activity, I want commands without the snap option to keep animating exactly as before, so that existing hosts and slide changes are unaffected.", () => {
@@ -242,9 +279,36 @@ describe("PRD: pose-interpolation", () => {
       "animate-after-snap: an animated command after a snap transitions from the snapped pose",
       // View-only — transitions are observable only on Babylon joint nodes
     );
-    it.todo(
-      "unrecognized: an unrecognized option value is treated as the default and does not throw",
-    );
+    it("unrecognized: an unrecognized option value is treated as the default and does not throw", () => {
+      const vm = readVM();
+      const countBefore = vm()?.snapCount;
+
+      const poseA = {
+        j1: Angle.FromDegrees(1),
+        j2: Angle.FromDegrees(1),
+        j3: Angle.FromDegrees(1),
+        j4: Angle.FromDegrees(1),
+        j5: Angle.FromDegrees(1),
+        j6: Angle.FromDegrees(1),
+      };
+      expect(() =>
+        facade.setPose(poseA, { transition: "bogus" } as never),
+      ).not.toThrow();
+      expect(vm()?.snapCount).toBe(countBefore);
+      expect(vm()?.j1.degrees).toBe(1);
+
+      const poseB = { ...poseA, j2: Angle.FromDegrees(2) };
+      expect(() => facade.setPose(poseB, {})).not.toThrow();
+      expect(vm()?.snapCount).toBe(countBefore);
+      expect(vm()?.j2.degrees).toBe(2);
+
+      const poseC = { ...poseA, j3: Angle.FromDegrees(3) };
+      expect(() =>
+        facade.setPose(poseC, { transition: "animate" }),
+      ).not.toThrow();
+      expect(vm()?.snapCount).toBe(countBefore);
+      expect(vm()?.j3.degrees).toBe(3);
+    });
   });
 
   describe("story-13: As a slide Activity, I want `applyState` to accept the same option, so that I can restore a slide's authored configuration either with a transition or instantly.", () => {
@@ -256,9 +320,52 @@ describe("PRD: pose-interpolation", () => {
       "controller-apply: `applyABB6700State` accepts the same option with the same behaviour",
       // View-only — snap versus transition on restore is observable only on Babylon joint nodes
     );
-    it.todo(
-      "contract: `applyState` stays callable with the snapshot alone and the facade still satisfies the SmartComponent structural convention; the option extends beyond the contract v1's documented `applyState(state)` signature without breaking it",
-    );
+    it("contract: `applyState` stays callable with the snapshot alone and the facade still satisfies the SmartComponent structural convention; the option extends beyond the contract v1's documented `applyState(state)` signature without breaking it", () => {
+      const sc: SmartComponent = facade;
+      expect(sc.id).toBe("arm-1");
+
+      const vm = readVM();
+      const countBefore = vm()?.snapCount ?? 0;
+
+      const stateA: ABB6700State = {
+        version: ABB_6700_STATE_VERSION,
+        j1: 1,
+        j2: 2,
+        j3: 3,
+        j4: 4,
+        j5: 5,
+        j6: 6,
+      };
+      facade.applyState(stateA);
+      expect(facade.getState()).toEqual(stateA);
+      expect(vm()?.snapCount).toBe(countBefore);
+
+      const stateB: ABB6700State = {
+        version: ABB_6700_STATE_VERSION,
+        j1: 11,
+        j2: 12,
+        j3: 13,
+        j4: 14,
+        j5: 15,
+        j6: 16,
+      };
+      facade.applyState(stateB, { transition: "none" });
+      expect(facade.getState()).toEqual(stateB);
+      expect(vm()?.snapCount).toBe(countBefore + 1);
+
+      const stateC: ABB6700State = {
+        version: ABB_6700_STATE_VERSION,
+        j1: 21,
+        j2: 22,
+        j3: 23,
+        j4: 24,
+        j5: 25,
+        j6: 26,
+      };
+      applyABB6700State("arm-1", appObjects, stateC, { transition: "none" });
+      expect(facade.getState()).toEqual(stateC);
+      expect(vm()?.snapCount).toBe(countBefore + 2);
+    });
   });
 
   describe("story-14: As a slide Activity, I want the snap option to change only how the pose is rendered, so that persistence, host UI and pacing are unaffected by it.", () => {

@@ -45,4 +45,22 @@ describe("setJointAngle controller", () => {
       "Unable to find SetJointAngleUC for ID: unknown-id",
     );
   });
+
+  it("passes the options through to the UC when given", () => {
+    const angle = Angle.FromDegrees(90);
+    setJointAngle("arm-1", "j3", angle, appObjects, { transition: "none" });
+
+    const uc = appObject.getComponent("SetJointAngleUC") as MockSetJointAngleUC;
+    expect(uc.setAngle).toHaveBeenCalledWith("j3", angle, {
+      transition: "none",
+    });
+  });
+
+  it("does not pass an options argument when none is given", () => {
+    const angle = Angle.FromDegrees(90);
+    setJointAngle("arm-1", "j3", angle, appObjects);
+
+    const uc = appObject.getComponent("SetJointAngleUC") as MockSetJointAngleUC;
+    expect(uc.setAngle).toHaveBeenCalledWith("j3", angle);
+  });
 });

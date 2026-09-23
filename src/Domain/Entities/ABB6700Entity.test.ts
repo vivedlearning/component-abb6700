@@ -282,4 +282,40 @@ describe("ABB6700Entity", () => {
       expect(observer).not.toHaveBeenCalled();
     });
   });
+
+  describe("Snap Count", () => {
+    let entity: ABB6700Entity;
+
+    beforeEach(() => {
+      const appObject = appObjects.getOrCreate("test-arm");
+      entity = makeABB6700Entity(appObject);
+    });
+
+    it("defaults to 0", () => {
+      expect(entity.snapCount).toBe(0);
+    });
+
+    it("requestSnap increments the count", () => {
+      entity.requestSnap();
+      expect(entity.snapCount).toBe(1);
+
+      entity.requestSnap();
+      expect(entity.snapCount).toBe(2);
+    });
+
+    it("requestSnap notifies observers", () => {
+      const observer = vi.fn();
+      entity.addChangeObserver(observer);
+      entity.requestSnap();
+      expect(observer).toHaveBeenCalledTimes(1);
+    });
+
+    it("requestSnap notifies observers even when called again with no other change", () => {
+      const observer = vi.fn();
+      entity.addChangeObserver(observer);
+      entity.requestSnap();
+      entity.requestSnap();
+      expect(observer).toHaveBeenCalledTimes(2);
+    });
+  });
 });
