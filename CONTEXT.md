@@ -77,7 +77,7 @@ The eased motion of the rendered arm from the pose currently on screen to a newl
 - **Transition duration** — `transitionDurationMs` on the entity, default 1000 ms (`ABB_6700_DEFAULT_TRANSITION_DURATION_MS`). Set per instance with `setTransitionDuration` (controller) or `ABB6700Facade.setTransitionDuration`, at any time, including before `load()`. Zero disables transitions. A negative or non-finite value is rejected with a warning and the previous value is kept. A change applies to the next commanded pose; a transition already in flight keeps its duration.
 - **Easing** — ease-in-out (smoothstep). The final frame writes the target exactly.
 - **Redirect** — a pose commanded mid-transition starts a new transition from the angles on screen, for the full duration. The superseded target is never visited.
-- **Snap** — no transition on the first pose after load, after a remount or rebind, or when the duration is zero.
+- **Snap** — no transition when the view first binds its nodes on load (it renders the current pose, including one commanded before load), after a remount or rebind, or when the duration is zero. The first pose commanded after the view has bound transitions normally.
 
 The transition duration is pacing, not **activity-authored configuration**: `ABB6700State` does not carry it.
 
