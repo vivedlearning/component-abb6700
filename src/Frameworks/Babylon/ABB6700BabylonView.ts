@@ -327,7 +327,12 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
   /** Write a pose directly to the nodes with no transition. */
   private snapTo(target: Pose, vm: ABB6700VM): void {
     this.writeJoints(target);
-    this.writeStabilizer(vm.stabilizerAngle.radians, vm.stabilizerExtension);
+    // Derive the stabilizer from J2 rather than trusting the VM's own values:
+    // the domain notifies once for the joint and again per derived stabilizer
+    // value, so the first VM carrying a new J2 can still carry the previous
+    // extension. Deriving keeps the linkage consistent whatever the order.
+    const stab = calcStabilizer(vm.j2);
+    this.writeStabilizer(stab.angle.radians, stab.extension);
     this.rendered = target;
     this.transition = undefined;
   }

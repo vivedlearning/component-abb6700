@@ -69,6 +69,8 @@ import {
 } from "./ABB6700BabylonView";
 import { clearABB6700AssetCache } from "./ABB6700AssetCache";
 import { calcStabilizer } from "../../Domain/UCs/CalcStabilizerUC";
+import { makeDomainForTesting } from "../../Domain/makeDomainForTesting";
+import { ABB6700Facade } from "../../ABB6700Facade";
 
 // ── Mock scene with a hand-driven render loop ─────────────────────────────
 
@@ -514,6 +516,35 @@ describe("ABB6700BabylonView pose transitions", () => {
       mock.frame(200);
       expect(j1.rotation.z).toBe(POSE_B.j1.radians);
     });
+  });
+
+  // ── story-7 / zero-disables through the real domain ───────────────────
+  //
+  // The domain emits more than one VM per command: a J2 change notifies once
+  // for the joint and again for each derived stabilizer value, so the first VM
+  // carrying the new J2 can still carry the previous extension. With animation
+  // disabled the view must not be fooled by that ordering.
+
+  it("story-7 / zero-disables (real domain): a J2-only command with a zero duration leaves the stabilizer consistent with the new J2", async () => {
+    const mock = makeMockScene();
+    const domain = makeDomainForTesting();
+    const facade = new ABB6700Facade("arm-1", domain.appObjects);
+    const appObject = domain.appObjects.get("arm-1")!;
+    vi.mocked(BabylonEntity.get).mockReturnValue({ scene: mock.scene } as never);
+    const view = await makeABB6700BabylonView(appObject);
+
+    const j2 = makeMesh("joint_2");
+    const stabRot = makeNode("stabilizer_joint_1");
+    const stabPrismatic = makeNode("stabilizer_joint_2");
+    callBindMeshes(view, [j2], [stabRot, stabPrismatic]);
+
+    facade.setTransitionDuration(0);
+    facade.setJointAngle("j2", Angle.FromDegrees(40));
+
+    const expected = calcStabilizer(Angle.FromDegrees(40));
+    expect(j2.rotation.z).toBe(Angle.FromDegrees(40).radians);
+    expect(stabRot.rotation.z).toBe(expected.angle.radians);
+    expect(stabPrismatic.position.z).toBe(expected.extension);
   });
 
   // ── story-9: destroy mid-transition ───────────────────────────────────
