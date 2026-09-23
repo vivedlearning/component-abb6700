@@ -47,7 +47,7 @@ Domain setup uses `DomainFactory` and a local per-instance factory in:
 The per-instance factory creates, in order:
 
 - `ABB6700Entity`
-- Per-instance UCs (`SetJointAngleUC`, `SetPoseUC`, `CalcStabilizerUC`)
+- Per-instance UCs (`SetJointAngleUC`, `SetPoseUC`, `SetTransitionDurationUC`, `CalcStabilizerUC`)
 - `ABB6700PM`
 
 ## Multi-UC Extension Pattern
