@@ -565,5 +565,28 @@ describe("ABB6700BabylonView pose transitions", () => {
       expect(first.observerCount()).toBe(0);
       expect(second.observerCount()).toBe(1);
     });
+
+    it("a reload mid-transition never advances the old transition onto the disposed nodes while the asset loads", async () => {
+      const first = makeMockScene();
+      const rig = await mountInTransition(first);
+      const oldJ1 = rig.joints[0];
+
+      first.frame(300);
+      const frozen = oldJ1.rotation.z;
+      expect(frozen).not.toBe(POSE_B.j1.radians);
+
+      // Reload into a new scene. The render observer attaches to the new
+      // scene synchronously; the asset load is still pending here.
+      const second = makeMockScene();
+      vi.mocked(BabylonEntity.get).mockReturnValue({ scene: second.scene } as never);
+      const loading = rig.view.load();
+
+      second.frame(300);
+      second.frame(300);
+
+      expect(oldJ1.rotation.z).toBe(frozen);
+      await loading;
+      expect(oldJ1.rotation.z).toBe(frozen);
+    });
   });
 });

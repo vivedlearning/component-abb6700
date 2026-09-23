@@ -155,6 +155,13 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
       );
     }
 
+    // A reload replaces the nodes. Drop any transition in flight and the
+    // rendered pose first, so the render observer attached below never
+    // advances the old transition onto disposed nodes while the new asset
+    // is still loading. bindMeshes() then snaps the new nodes to lastVM.
+    this.transition = undefined;
+    this.rendered = undefined;
+
     // Dispose previous instance if load is called again
     this.instantiatedEntries?.dispose();
 
