@@ -55,4 +55,20 @@ describe("setPose controller", () => {
       "Unable to find SetPoseUC for ID: unknown-id",
     );
   });
+
+  it("passes the options through to the UC when given", () => {
+    const pose = makePose();
+    setPose("arm-1", pose, appObjects, { transition: "none" });
+
+    const uc = appObject.getComponent("SetPoseUC") as MockSetPoseUC;
+    expect(uc.setPose).toHaveBeenCalledWith(pose, { transition: "none" });
+  });
+
+  it("does not pass an options argument when none is given", () => {
+    const pose = makePose();
+    setPose("arm-1", pose, appObjects);
+
+    const uc = appObject.getComponent("SetPoseUC") as MockSetPoseUC;
+    expect(uc.setPose).toHaveBeenCalledWith(pose);
+  });
 });

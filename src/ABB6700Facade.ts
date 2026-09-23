@@ -9,7 +9,10 @@ import { setTransitionDuration } from "./Domain/Controllers/setTransitionDuratio
 import { ABB6700Entity } from "./Domain/Entities/ABB6700Entity";
 import type { ABB6700VM } from "./Domain/PMs/ABB6700PM";
 import type { ABB6700Joint } from "./Domain/UCs/SetJointAngleUC";
-import type { ABB6700Pose } from "./Domain/UCs/SetPoseUC";
+import type {
+  ABB6700Pose,
+  ABB6700TransitionOption,
+} from "./Domain/UCs/SetPoseUC";
 import { ABB6700Repo } from "./Domain/Entities/ABB6700Repo";
 import type { SmartComponent } from "./SmartComponent";
 import {
@@ -60,12 +63,16 @@ export class ABB6700Facade implements SmartComponent {
     ABB6700Repo.get(this.appObjects)?.deleteABB6700Entity(this.id);
   }
 
-  setPose(pose: ABB6700Pose): void {
-    setPose(this.id, pose, this.appObjects);
+  setPose(pose: ABB6700Pose, options?: ABB6700TransitionOption): void {
+    setPose(this.id, pose, this.appObjects, options);
   }
 
-  setJointAngle(joint: ABB6700Joint, angle: Angle): void {
-    setJointAngle(this.id, joint, angle, this.appObjects);
+  setJointAngle(
+    joint: ABB6700Joint,
+    angle: Angle,
+    options?: ABB6700TransitionOption,
+  ): void {
+    setJointAngle(this.id, joint, angle, this.appObjects, options);
   }
 
   setTransitionDuration(ms: number): void {
@@ -76,8 +83,8 @@ export class ABB6700Facade implements SmartComponent {
     return getABB6700State(this.id, this.appObjects, ABB_6700_STATE_VERSION);
   }
 
-  applyState(state: ABB6700State): void {
-    applyABB6700State(this.id, this.appObjects, state);
+  applyState(state: ABB6700State, options?: ABB6700TransitionOption): void {
+    applyABB6700State(this.id, this.appObjects, state, options);
   }
 
   onEvent(event: string, cb: (...args: never[]) => void): () => void;

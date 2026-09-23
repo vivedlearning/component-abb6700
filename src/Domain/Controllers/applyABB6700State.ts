@@ -1,5 +1,5 @@
 import { Angle, AppObjectRepo } from "@vived/core";
-import { SetPoseUC } from "../UCs/SetPoseUC";
+import { SetPoseUC, type ABB6700TransitionOption } from "../UCs/SetPoseUC";
 import {
   ABB_6700_DEFAULT_JOINT_DEGREES,
   type ABB6700State,
@@ -21,11 +21,13 @@ import {
  * @param id - The ID of the ABB 6700 instance.
  * @param appObjects - The AppObject repository.
  * @param state - The snapshot to restore.
+ * @param options - Optional per-command rendering option (e.g. `{ transition: "none" }`).
  */
 export function applyABB6700State(
   id: string,
   appObjects: AppObjectRepo,
   state: ABB6700State,
+  options?: ABB6700TransitionOption,
 ): void {
   const uc = SetPoseUC.getById(id, appObjects);
 
@@ -42,12 +44,15 @@ export function applyABB6700State(
       ? v
       : ABB_6700_DEFAULT_JOINT_DEGREES;
 
-  uc.setPose({
-    j1: Angle.FromDegrees(deg(state.j1)),
-    j2: Angle.FromDegrees(deg(state.j2)),
-    j3: Angle.FromDegrees(deg(state.j3)),
-    j4: Angle.FromDegrees(deg(state.j4)),
-    j5: Angle.FromDegrees(deg(state.j5)),
-    j6: Angle.FromDegrees(deg(state.j6)),
-  });
+  uc.setPose(
+    {
+      j1: Angle.FromDegrees(deg(state.j1)),
+      j2: Angle.FromDegrees(deg(state.j2)),
+      j3: Angle.FromDegrees(deg(state.j3)),
+      j4: Angle.FromDegrees(deg(state.j4)),
+      j5: Angle.FromDegrees(deg(state.j5)),
+      j6: Angle.FromDegrees(deg(state.j6)),
+    },
+    options,
+  );
 }

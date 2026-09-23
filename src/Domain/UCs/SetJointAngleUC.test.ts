@@ -1,16 +1,17 @@
 ﻿import { describe, it, expect, beforeEach } from "vitest";
 import { Angle, AppObject, makeAppObjectRepo } from "@vived/core";
-import { makeABB6700Entity } from "../Entities/ABB6700Entity";
+import { ABB6700Entity, makeABB6700Entity } from "../Entities/ABB6700Entity";
 import { SetJointAngleUC, makeSetJointAngleUC } from "./SetJointAngleUC";
 
 describe("SetJointAngleUC", () => {
   let appObject: AppObject;
+  let entity: ABB6700Entity;
   let uc: SetJointAngleUC;
 
   beforeEach(() => {
     const appObjects = makeAppObjectRepo();
     appObject = appObjects.getOrCreate("test-arm");
-    makeABB6700Entity(appObject);
+    entity = makeABB6700Entity(appObject);
     uc = makeSetJointAngleUC(appObject);
   });
 
@@ -38,5 +39,23 @@ describe("SetJointAngleUC", () => {
     expect(entity["j2"].degrees).toBe(0);
     expect(entity["j3"].degrees).toBe(90);
     expect(entity["j6"].degrees).toBe(-45);
+  });
+
+  describe("snap option", () => {
+    it("does not increment snapCount when no options are given", () => {
+      uc.setAngle("j1", Angle.FromDegrees(10));
+      expect(entity.snapCount).toBe(0);
+    });
+
+    it('does not increment snapCount when transition is "transition"', () => {
+      uc.setAngle("j1", Angle.FromDegrees(10), { transition: "transition" });
+      expect(entity.snapCount).toBe(0);
+    });
+
+    it('increments snapCount when transition is "none"', () => {
+      uc.setAngle("j1", Angle.FromDegrees(10), { transition: "none" });
+      expect(entity.snapCount).toBe(1);
+      expect(entity.j1.degrees).toBe(10);
+    });
   });
 });

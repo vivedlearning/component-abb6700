@@ -70,7 +70,8 @@ import {
 import { clearABB6700AssetCache } from "./ABB6700AssetCache";
 import { calcStabilizer } from "../../Domain/UCs/CalcStabilizerUC";
 import { makeDomainForTesting } from "../../Domain/makeDomainForTesting";
-import { ABB6700Facade } from "../../ABB6700Facade";
+import { ABB6700Facade, ABB_6700_STATE_VERSION } from "../../ABB6700Facade";
+import { applyABB6700State } from "../../Domain/Controllers/applyABB6700State";
 
 // ── Mock scene with a hand-driven render loop ─────────────────────────────
 
@@ -157,6 +158,7 @@ function makeVM(overrides: Partial<ABB6700VM> = {}): ABB6700VM {
     stabilizerAngle: stab.angle,
     stabilizerExtension: stab.extension,
     transitionDurationMs: ABB_6700_DEFAULT_TRANSITION_DURATION_MS,
+    snapCount: 0,
     ...overrides,
   };
 }
@@ -522,7 +524,7 @@ describe("ABB6700BabylonView pose transitions", () => {
   //
   // The domain emits more than one VM per command: a J2 change notifies once
   // for the joint and again for each derived stabilizer value, so the first VM
-  // carrying the new J2 can still carry the previous extension. With animation
+  // carrying the new J2 can still carry the previous extension. With transitions
   // disabled the view must not be fooled by that ordering.
 
   it("story-7 / zero-disables (real domain): a J2-only command with a zero duration leaves the stabilizer consistent with the new J2", async () => {
@@ -619,5 +621,243 @@ describe("ABB6700BabylonView pose transitions", () => {
       await loading;
       expect(oldJ1.rotation.z).toBe(frozen);
     });
+  });
+
+  // ── stories 11–16: per-command snap option ────────────────────────────
+  //
+  // The domain signals a snap by incrementing ABB6700VM.snapCount after the
+  // joints are written. The view snaps whenever the count differs from the
+  // last one it saw.
+
+  /** Mount a six-joint arm driven by the real domain through a facade. */
+  async function mountRealArm(mock: MockScene, id = "arm-1") {
+    const domain = makeDomainForTesting();
+    const facade = new ABB6700Facade(id, domain.appObjects);
+    const appObject = domain.appObjects.get(id)!;
+    vi.mocked(BabylonEntity.get).mockReturnValue({ scene: mock.scene } as never);
+    const view = await makeABB6700BabylonView(appObject);
+    const joints = [1, 2, 3, 4, 5, 6].map((n) => makeMesh(`joint_${n}`));
+    const stabRot = makeNode("stabilizer_joint_1");
+    const stabPrismatic = makeNode("stabilizer_joint_2");
+    callBindMeshes(view, joints, [stabRot, stabPrismatic]);
+    return { domain, facade, view, joints, stabRot, stabPrismatic };
+  }
+
+  function expectAt(joints: AbstractMesh[], pose: typeof POSE_A) {
+    const targets = [pose.j1, pose.j2, pose.j3, pose.j4, pose.j5, pose.j6];
+    joints.forEach((node, i) => expect(node.rotation.z).toBe(targets[i].radians));
+  }
+
+  describe("story-11: a snap command renders the arm at the target with no transition", () => {
+    it("snap-pose: a pose VM with a new snap count renders the whole arm at the target at once", async () => {
+      const mock = makeMockScene();
+      const rig = await mountInTransition(mock);
+      mock.frame(300);
+
+      rig.pm.doUpdateView(makeVM({ ...POSE_C, snapCount: 1 }));
+
+      expectAt(rig.joints, POSE_C);
+      expect(rig.stabRot.rotation.z).toBe(calcStabilizer(POSE_C.j2).angle.radians);
+      mock.frame(100);
+      expectAt(rig.joints, POSE_C);
+    });
+
+    it("snap-joint: a single-joint snap lands every joint still in transition on its target", async () => {
+      const mock = makeMockScene();
+      const rig = await mountInTransition(mock); // A -> B in flight
+      mock.frame(300);
+
+      const target = { ...POSE_B, j3: Angle.FromDegrees(70) };
+      rig.pm.doUpdateView(makeVM({ ...target, snapCount: 1 }));
+
+      expectAt(rig.joints, target);
+    });
+
+    it("cancels-in-flight: frames after a mid-transition snap never visit the superseded target", async () => {
+      const mock = makeMockScene();
+      const rig = await mountInTransition(mock); // A -> B
+      mock.frame(300);
+
+      rig.pm.doUpdateView(makeVM({ ...POSE_C, snapCount: 1 }));
+      for (let i = 0; i < 12; i++) {
+        mock.frame(100);
+        expect(rig.joints[0].rotation.z).toBe(POSE_C.j1.radians);
+      }
+    });
+
+    it("same-target: a snap to the in-flight target ends the transition immediately", async () => {
+      const mock = makeMockScene();
+      const rig = await mountInTransition(mock); // A -> B
+      mock.frame(300);
+      expect(rig.joints[0].rotation.z).not.toBe(POSE_B.j1.radians);
+
+      rig.pm.doUpdateView(makeVM({ ...POSE_B, snapCount: 1 }));
+
+      expectAt(rig.joints, POSE_B);
+      mock.frame(100);
+      expectAt(rig.joints, POSE_B);
+    });
+
+    it("real domain: facade.setPose with { transition: \"none\" } mid-transition snaps despite the per-joint emissions", async () => {
+      const mock = makeMockScene();
+      const { facade, joints } = await mountRealArm(mock);
+      facade.setPose(POSE_B);
+      mock.frame(300);
+
+      facade.setPose(POSE_C, { transition: "none" });
+
+      expectAt(joints, POSE_C);
+      mock.frame(100);
+      expectAt(joints, POSE_C);
+    });
+
+    it("real domain: a snap to the current target ends a transition in flight", async () => {
+      const mock = makeMockScene();
+      const { facade, joints } = await mountRealArm(mock);
+      facade.setPose(POSE_B);
+      mock.frame(300);
+
+      facade.setPose(POSE_B, { transition: "none" });
+
+      expectAt(joints, POSE_B);
+    });
+
+    it("real domain: facade.setJointAngle with { transition: \"none\" } snaps the whole arm", async () => {
+      const mock = makeMockScene();
+      const { facade, joints } = await mountRealArm(mock);
+      facade.setPose(POSE_B);
+      mock.frame(300);
+
+      facade.setJointAngle("j3", Angle.FromDegrees(70), { transition: "none" });
+
+      expectAt(joints, { ...POSE_B, j3: Angle.FromDegrees(70) });
+    });
+  });
+
+  describe("story-12: commands without the snap option transition as before", () => {
+    it("default-transitions: an unchanged snap count still transitions", async () => {
+      const mock = makeMockScene();
+      const rig = await mountInTransition(mock); // counts are 0 throughout
+      mock.frame(500);
+      const p = progress(rig.joints[0].rotation.z, POSE_A.j1, POSE_B.j1);
+      expect(p).toBeCloseTo(0.5, 6);
+    });
+
+    it("transition-after-snap: a command without the snap option, issued after a snap, transitions from the snapped pose", async () => {
+      const mock = makeMockScene();
+      const rig = await mountArm("arm-1", mock);
+      rig.pm.doUpdateView(makeVM(POSE_A));
+      rig.pm.doUpdateView(makeVM({ ...POSE_C, snapCount: 1 }));
+      expectAt(rig.joints, POSE_C);
+
+      rig.pm.doUpdateView(makeVM({ ...POSE_B, snapCount: 1 }));
+      mock.frame(500);
+
+      const p = progress(rig.joints[0].rotation.z, POSE_C.j1, POSE_B.j1);
+      expect(p).toBeCloseTo(0.5, 6);
+    });
+
+    it("real domain: a command without the snap option, issued after a snap, transitions", async () => {
+      const mock = makeMockScene();
+      const { facade, joints } = await mountRealArm(mock);
+      facade.setPose(POSE_C, { transition: "none" });
+      facade.setPose(POSE_B);
+      mock.frame(500);
+
+      const p = progress(joints[0].rotation.z, POSE_C.j1, POSE_B.j1);
+      expect(p).toBeCloseTo(0.5, 6);
+    });
+  });
+
+  describe("story-13: applyState honours the snap option", () => {
+    const toState = (pose: typeof POSE_A) => ({
+      version: ABB_6700_STATE_VERSION,
+      j1: pose.j1.degrees,
+      j2: pose.j2.degrees,
+      j3: pose.j3.degrees,
+      j4: pose.j4.degrees,
+      j5: pose.j5.degrees,
+      j6: pose.j6.degrees,
+    });
+
+    it("facade-apply: applyState with the snap option renders at once; without it the restore transitions", async () => {
+      const mock = makeMockScene();
+      const { facade, joints } = await mountRealArm(mock);
+
+      facade.applyState(toState(POSE_B), { transition: "none" });
+      expect(joints[0].rotation.z).toBeCloseTo(POSE_B.j1.radians, 10);
+
+      facade.applyState(toState(POSE_C));
+      mock.frame(500);
+      const p = progress(joints[0].rotation.z, POSE_B.j1, POSE_C.j1);
+      expect(p).toBeCloseTo(0.5, 6);
+    });
+
+    it("controller-apply: applyABB6700State with the snap option renders at once", async () => {
+      const mock = makeMockScene();
+      const { domain, facade, joints } = await mountRealArm(mock);
+      facade.setPose(POSE_A);
+      facade.setPose(POSE_B);
+      mock.frame(300);
+
+      applyABB6700State("arm-1", domain.appObjects, toState(POSE_C), {
+        transition: "none",
+      });
+
+      expect(joints[0].rotation.z).toBeCloseTo(POSE_C.j1.radians, 10);
+      mock.frame(100);
+      expect(joints[0].rotation.z).toBeCloseTo(POSE_C.j1.radians, 10);
+    });
+  });
+
+  it("story-14 / zero-duration: with a zero duration, commands render at once with or without the snap option", async () => {
+    const mock = makeMockScene();
+    const { facade, joints } = await mountRealArm(mock);
+    facade.setTransitionDuration(0);
+
+    facade.setPose(POSE_B);
+    expectAt(joints, POSE_B);
+
+    facade.setPose(POSE_C, { transition: "none" });
+    expectAt(joints, POSE_C);
+  });
+
+  it("story-15: a snap on one arm leaves another arm's transition running", async () => {
+    const mock = makeMockScene();
+    const arm1 = await mountArm("arm-1", mock);
+    const arm2 = await mountArm("arm-2", mock);
+    for (const arm of [arm1, arm2]) {
+      arm.pm.doUpdateView(makeVM(POSE_A));
+      arm.pm.doUpdateView(makeVM(POSE_B));
+    }
+    mock.frame(300);
+    const arm2Before = arm2.joints[0].rotation.z;
+
+    arm1.pm.doUpdateView(makeVM({ ...POSE_B, snapCount: 1 }));
+
+    expectAt(arm1.joints, POSE_B);
+    expect(arm2.joints[0].rotation.z).toBe(arm2Before);
+    mock.frame(200);
+    expect(arm2.joints[0].rotation.z).not.toBe(arm2Before);
+    expect(arm2.joints[0].rotation.z).not.toBe(POSE_B.j1.radians);
+  });
+
+  it("story-16: a snap commanded before the view attaches does not make the first command after load snap", async () => {
+    const mock = makeMockScene();
+    const domain = makeDomainForTesting();
+    const facade = new ABB6700Facade("arm-1", domain.appObjects);
+    facade.setPose(POSE_B, { transition: "none" }); // before any view exists
+
+    const appObject = domain.appObjects.get("arm-1")!;
+    vi.mocked(BabylonEntity.get).mockReturnValue({ scene: mock.scene } as never);
+    const view = await makeABB6700BabylonView(appObject);
+    const joints = [1, 2, 3, 4, 5, 6].map((n) => makeMesh(`joint_${n}`));
+    callBindMeshes(view, joints);
+    expectAt(joints, POSE_B);
+
+    facade.setPose(POSE_C);
+    mock.frame(500);
+    const p = progress(joints[0].rotation.z, POSE_B.j1, POSE_C.j1);
+    expect(p).toBeCloseTo(0.5, 6);
   });
 });

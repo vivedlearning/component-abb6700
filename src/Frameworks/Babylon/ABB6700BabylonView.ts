@@ -102,6 +102,8 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
   /** The pose currently written to the nodes, or undefined before the first render. */
   private rendered: Pose | undefined;
   private transition: Transition | undefined;
+  /** The last vm.snapCount seen, or undefined before the first VM. */
+  private lastSnapCount: number | undefined;
   private scene: Scene | undefined;
   private renderObserver: Observer<Scene> | null = null;
 
@@ -348,9 +350,20 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
       vm.j6.radians,
     ];
 
+    const priorSnapCount = this.lastSnapCount;
+    this.lastSnapCount = vm.snapCount;
+
     // Nothing rendered yet (first VM, or a fresh bindMeshes): appear
     // directly in the commanded pose.
     if (!this.rendered) {
+      this.snapTo(target, vm);
+      return;
+    }
+
+    // A snap count that differs from the last one seen ends any transition
+    // in flight immediately, even to the currently in-flight target: the
+    // domain has requested a hard cut, not a retarget.
+    if (priorSnapCount !== undefined && vm.snapCount !== priorSnapCount) {
       this.snapTo(target, vm);
       return;
     }

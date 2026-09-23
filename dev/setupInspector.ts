@@ -69,6 +69,9 @@ export function setupInspector(
           joint as ABB6700Joint,
           Angle.FromDegrees(deg),
           appObjects,
+          // A slider drag is direct manipulation: snap each tick instead of
+          // starting a new transition, so the arm tracks the slider exactly.
+          { transition: "none" },
         );
       },
     });

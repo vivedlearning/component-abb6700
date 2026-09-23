@@ -58,13 +58,13 @@ _Avoid_: spelling it "EOAT" or "end effector" in the API — the code and GLB us
 
 ## ABB6700Entity
 
-The per-instance source of truth. Holds `j1`–`j6` (each a `MemoizedAngle`, default 0°), the derived `stabilizerAngle` (`MemoizedAngle`) and `stabilizerExtension` (`number`), and the `transitionDurationMs` (`number`, default 1000) the view uses for **pose transitions**. Setters fire `notifyOnChange`; the PM observes it and emits an immutable VM.
+The per-instance source of truth. Holds `j1`–`j6` (each a `MemoizedAngle`, default 0°), the derived `stabilizerAngle` (`MemoizedAngle`) and `stabilizerExtension` (`number`), the `transitionDurationMs` (`number`, default 1000) the view uses for **pose transitions**, and `snapCount` (`number`, starts at 0), which a snap command increments. Setters fire `notifyOnChange`; the PM observes it and emits an immutable VM.
 
 ---
 
 ## ABB6700VM
 
-The immutable view model emitted by `ABB6700PM`. Carries the six joint `Angle`s, the derived stabilizer angle and extension, and `transitionDurationMs`. No VM ever carries interpolated angles. A single pose command can emit several VMs (the joints are written one at a time, and the stabilizer is derived after J2), so intermediate VMs may show a partial pose; the last VM delivered for the command carries the full commanded **target**. Redundant emissions are suppressed via `vmsAreEqual` (degree-level comparison). Views and hosts subscribe through `aBB6700PMAdapter`.
+The immutable view model emitted by `ABB6700PM`. Carries the six joint `Angle`s, the derived stabilizer angle and extension, `transitionDurationMs`, and `snapCount`. No VM ever carries interpolated angles. A single pose command can emit several VMs (the joints are written one at a time, and the stabilizer is derived after J2), so intermediate VMs may show a partial pose; the last VM delivered for the command carries the full commanded **target**. Redundant emissions are suppressed via `vmsAreEqual` (degree-level comparison). Views and hosts subscribe through `aBB6700PMAdapter`.
 
 _Avoid_: reading entity fields directly from a view — bind to the VM.
 
@@ -78,10 +78,11 @@ The eased motion of the rendered arm from the pose currently on screen to a newl
 - **Easing** — ease-in-out (smoothstep). The final frame writes the target exactly.
 - **Redirect** — a pose commanded mid-transition starts a new transition from the angles on screen, for the full duration. The superseded target is never visited.
 - **Snap** — no transition when the view first binds its nodes on load (it renders the current pose, including one commanded before load), after a remount or rebind, or when the duration is zero. The first pose commanded after the view has bound transitions normally.
+- **Snap command** — a caller can ask for a snap per command by passing `{ transition: "none" }` to `setPose`, `setJointAngle` or `applyState` (facade or controller). The rendered arm lands on the commanded target at once, ending any transition in flight, even when the target has not changed. Leaving the option out, or passing `"transition"`, transitions as usual. The domain signals it by incrementing `snapCount` after writing the joints, and the view snaps whenever the count changes. It affects rendering only: the committed target, `getState()` and the transition duration are the same either way. Use it for direct manipulation such as dragging a joint slider; a slide change should transition.
 
 The transition duration is pacing, not **activity-authored configuration**: `ABB6700State` does not carry it.
 
-_Avoid_: calling it "animation" or "lerp" in the API, and interpolating in the domain or PM — the VM must keep reporting the target.
+_Avoid_: calling it "animation", "animate" or "lerp" — in the API, in option values, or in prose about pose transitions. **"Animation" is reserved for actual model animations** (keyframed clips a model may carry), which the component may support later. Also avoid interpolating in the domain or PM — the VM must keep reporting the target — and avoid toggling the transition duration to get a one-off snap; use a snap command.
 
 ---
 

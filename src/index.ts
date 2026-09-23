@@ -62,6 +62,7 @@ export {
   SetPoseUC,
   makeSetPoseUC,
   type ABB6700Pose,
+  type ABB6700TransitionOption,
 } from "./Domain/UCs/SetPoseUC";
 export {
   SetTransitionDurationUC,

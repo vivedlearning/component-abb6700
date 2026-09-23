@@ -140,6 +140,14 @@ describe("ABB6700PM", () => {
       const vm = viewObserver.mock.calls[0][0] as ABB6700VM;
       expect(vm.transitionDurationMs).toBe(250);
     });
+
+    it("copies the entity snapCount into the VM", () => {
+      entity.requestSnap();
+
+      expect(viewObserver).toHaveBeenCalledOnce();
+      const vm = viewObserver.mock.calls[0][0] as ABB6700VM;
+      expect(vm.snapCount).toBe(1);
+    });
   });
 
   describe("VM Comparison Logic", () => {
@@ -162,6 +170,7 @@ describe("ABB6700PM", () => {
         stabilizerAngle: Angle.FromDegrees(5),
         stabilizerExtension: 0.01,
         transitionDurationMs: ABB_6700_DEFAULT_TRANSITION_DURATION_MS,
+        snapCount: 0,
       };
       const vm2: ABB6700VM = {
         j1: Angle.FromDegrees(10),
@@ -173,6 +182,7 @@ describe("ABB6700PM", () => {
         stabilizerAngle: Angle.FromDegrees(5),
         stabilizerExtension: 0.01,
         transitionDurationMs: ABB_6700_DEFAULT_TRANSITION_DURATION_MS,
+        snapCount: 0,
       };
 
       expect(pm.vmsAreEqual(vm1, vm2)).toBe(true);
@@ -189,6 +199,7 @@ describe("ABB6700PM", () => {
         stabilizerAngle: Angle.FromDegrees(0),
         stabilizerExtension: 0,
         transitionDurationMs: ABB_6700_DEFAULT_TRANSITION_DURATION_MS,
+        snapCount: 0,
       };
       const vm2: ABB6700VM = {
         j1: Angle.FromDegrees(20),
@@ -200,6 +211,7 @@ describe("ABB6700PM", () => {
         stabilizerAngle: Angle.FromDegrees(0),
         stabilizerExtension: 0,
         transitionDurationMs: ABB_6700_DEFAULT_TRANSITION_DURATION_MS,
+        snapCount: 0,
       };
 
       expect(pm.vmsAreEqual(vm1, vm2)).toBe(false);
@@ -216,10 +228,32 @@ describe("ABB6700PM", () => {
         stabilizerAngle: Angle.FromDegrees(0),
         stabilizerExtension: 0,
         transitionDurationMs: 1000,
+        snapCount: 0,
       };
       const vm2: ABB6700VM = {
         ...vm1,
         transitionDurationMs: 250,
+      };
+
+      expect(pm.vmsAreEqual(vm1, vm2)).toBe(false);
+    });
+
+    it("considers VMs with different snapCount as not equal", () => {
+      const vm1: ABB6700VM = {
+        j1: Angle.FromDegrees(0),
+        j2: Angle.FromDegrees(0),
+        j3: Angle.FromDegrees(0),
+        j4: Angle.FromDegrees(0),
+        j5: Angle.FromDegrees(0),
+        j6: Angle.FromDegrees(0),
+        stabilizerAngle: Angle.FromDegrees(0),
+        stabilizerExtension: 0,
+        transitionDurationMs: ABB_6700_DEFAULT_TRANSITION_DURATION_MS,
+        snapCount: 0,
+      };
+      const vm2: ABB6700VM = {
+        ...vm1,
+        snapCount: 1,
       };
 
       expect(pm.vmsAreEqual(vm1, vm2)).toBe(false);

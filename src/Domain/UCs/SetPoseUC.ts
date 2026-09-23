@@ -11,6 +11,15 @@ export interface ABB6700Pose {
 }
 
 /**
+ * Per-command rendering option for setPose, setJointAngle and applyState.
+ * Only the exact value "none" snaps; undefined, "transition", a missing object,
+ * or any other value transitions.
+ */
+export type ABB6700TransitionOption = {
+  transition?: "none" | "transition";
+};
+
+/**
  * SetPoseUC
  *
  * Use case for setting all joint angles on an ABB 6700 instance atomically.
@@ -18,7 +27,7 @@ export interface ABB6700Pose {
 export abstract class SetPoseUC extends AppObjectUC {
   static readonly type = "SetPoseUC";
 
-  abstract setPose(pose: ABB6700Pose): void;
+  abstract setPose(pose: ABB6700Pose, options?: ABB6700TransitionOption): void;
 
   static get(appObj: AppObject): SetPoseUC | undefined {
     return appObj.getComponent<SetPoseUC>(this.type);
@@ -38,7 +47,7 @@ class SetPoseUCImp extends SetPoseUC {
     return this.getCachedLocalComponent<ABB6700Entity>(ABB6700Entity.type);
   }
 
-  setPose(pose: ABB6700Pose): void {
+  setPose(pose: ABB6700Pose, options?: ABB6700TransitionOption): void {
     const entity = this.entity;
     if (!entity) {
       this.warn("Missing ABB6700Entity");
@@ -50,6 +59,10 @@ class SetPoseUCImp extends SetPoseUC {
     entity.j4 = pose.j4;
     entity.j5 = pose.j5;
     entity.j6 = pose.j6;
+
+    if (options?.transition === "none") {
+      entity.requestSnap();
+    }
   }
 
   constructor(appObject: AppObject) {
