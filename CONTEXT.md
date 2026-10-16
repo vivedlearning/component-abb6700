@@ -58,13 +58,13 @@ _Avoid_: spelling it "EOAT" or "end effector" in the API — the code and GLB us
 
 ## ABB6700Entity
 
-The per-instance source of truth. Holds `j1`–`j6` (each a `MemoizedAngle`, default 0°), the derived `stabilizerAngle` (`MemoizedAngle`) and `stabilizerExtension` (`number`), the `transitionDurationMs` (`number`, default 1000) the view uses for **pose transitions**, and `snapCount` (`number`, starts at 0), which a snap command increments. Setters fire `notifyOnChange`; the PM observes it and emits an immutable VM.
+The per-instance source of truth. Holds `j1`–`j6` (each a `MemoizedAngle`, default 0°), the derived `stabilizerAngle` (`MemoizedAngle`) and `stabilizerExtension` (`number`), the `transitionDurationMs` (`number`, default 1000) the view uses for **pose transitions**, `snapCount` (`number`, starts at 0), which a snap command increments, and the **path** in progress, if any (its segments, the current segment's index and phase). Setters fire `notifyOnChange`; the PM observes it and emits an immutable VM.
 
 ---
 
 ## ABB6700VM
 
-The immutable view model emitted by `ABB6700PM`. Carries the six joint `Angle`s, the derived stabilizer angle and extension, `transitionDurationMs`, and `snapCount`. No VM ever carries interpolated angles. A single pose command can emit several VMs (the joints are written one at a time, and the stabilizer is derived after J2), so intermediate VMs may show a partial pose; the last VM delivered for the command carries the full commanded **target**. Redundant emissions are suppressed via `vmsAreEqual` (degree-level comparison). Views and hosts subscribe through `aBB6700PMAdapter`.
+The immutable view model emitted by `ABB6700PM`. Carries the six joint `Angle`s, the derived stabilizer angle and extension, `transitionDurationMs`, `snapCount`, and `path`: the **path** in progress (the current segment's index and phase), or `undefined` when none is. No VM ever carries interpolated angles. A single pose command can emit several VMs (the joints are written one at a time, and the stabilizer is derived after J2), so intermediate VMs may show a partial pose; the last VM delivered for the command carries the full commanded **target**. Redundant emissions are suppressed via `vmsAreEqual` (degree-level comparison). Views and hosts subscribe through `aBB6700PMAdapter`.
 
 _Avoid_: reading entity fields directly from a view — bind to the VM.
 
@@ -79,10 +79,50 @@ The eased motion of the rendered arm from the pose currently on screen to a newl
 - **Redirect** — a pose commanded mid-transition starts a new transition from the angles on screen, for the full duration. The superseded target is never visited.
 - **Snap** — no transition when the view first binds its nodes on load (it renders the current pose, including one commanded before load), after a remount or rebind, or when the duration is zero. The first pose commanded after the view has bound transitions normally.
 - **Snap command** — a caller can ask for a snap per command by passing `{ transition: "none" }` to `setPose`, `setJointAngle` or `applyState` (facade or controller). The rendered arm lands on the commanded target at once, ending any transition in flight, even when the target has not changed. Leaving the option out, or passing `"transition"`, transitions as usual. The domain signals it by incrementing `snapCount` after writing the joints, and the view snaps whenever the count changes. It affects rendering only: the committed target, `getState()` and the transition duration are the same either way. Use it for direct manipulation such as dragging a joint slider; a slide change should transition.
+- **Path segments** — each **segment** of a **path** plays as a pose transition over the segment's own duration; `transitionDurationMs` does not apply to it. A **path stop** is the one case where motion writes a pose: the pose the view brings the arm to rest at is committed back to the domain (ADR-0007).
 
 The transition duration is pacing, not **activity-authored configuration**: `ABB6700State` does not carry it.
 
 _Avoid_: calling it "animation", "animate" or "lerp" — in the API, in option values, or in prose about pose transitions. **"Animation" is reserved for actual model animations** (keyframed clips a model may carry), which the component may support later. Also avoid interpolating in the domain or PM — the VM must keep reporting the target — and avoid toggling the transition duration to get a one-off snap; use a snap command.
+
+---
+
+## Path
+
+An ordered list of **segments** that a host asks the arm to play as one motion, started with `playPath` (facade or controller). The host owns which path to play and how long each segment takes. The component owns how the arm moves through it. Each segment's pose is committed to the entity, the VM and `getState()` as that segment starts, so a path is never part of `ABB6700State`: a snapshot taken mid-path holds the pose committed last.
+
+- A path starts from the angles on screen, as a redirect does.
+- The host follows progress through three payload-free events: `pathSegmentReached` (the arm has arrived at a segment's pose; the VM's `path` names the segment), `pathCompleted` (the last segment, and its dwell, are done) and `pathStopped` (a **path stop** has brought the arm to rest).
+- A pose command (`setPose`, `setJointAngle`, `applyState`, with or without a snap) or a new `playPath` cancels the path in progress, with no event.
+- A path advances only while the arm's Babylon view renders (ADR-0007). Before `load()`, it waits on its first segment.
+
+_Avoid_: "program" (the host's Weld Program is what it plays as paths), "trajectory", "sequence", "animation".
+
+---
+
+## Segment
+
+One step of a **path**: a target pose, the travel time to it (`durationMs`), and an optional **dwell** at its end. The host computes the travel time and the component honours it as given, even when the pose has not changed; a zero travel time snaps. The segment's pose is committed as the segment starts. The segment is *reached* when the rendered arm arrives at that pose.
+
+_Avoid_: "waypoint", "keyframe", "step", "move".
+
+---
+
+## Dwell
+
+The time, in milliseconds, the arm holds still at a **segment**'s pose after reaching it and before the next segment starts. Optional; zero when left out. A host fires its tooling, such as a weld, during a dwell.
+
+_Avoid_: "pause", "wait", "hold".
+
+---
+
+## Path stop
+
+The hard stop of a **path** in flight, requested with `stopPath`. The rendered arm slows along its current segment from the speed it has on screen and comes to rest within the stop duration (default 400 ms, `ABB_6700_DEFAULT_STOP_DURATION_MS`). It never passes the segment's pose and never starts another segment, and the rest of the path is dropped. The pose the arm rests at is then committed to the entity, the VM and `getState()`, and `pathStopped` fires. An arm already at rest (in a dwell, or at the very start of a segment) stops where it is. With no path in progress, `stopPath` does nothing.
+
+"Finish the current segment, then stop" is the host's to do: it does not queue more segments.
+
+_Avoid_: "halt" and "freeze"; "cancel", which is what a pose command does to a path, with no deceleration; "E-stop", which is a host's reason to stop, not the component's.
 
 ---
 
@@ -107,7 +147,7 @@ _Avoid_: calling this a "base class" or "interface package" — it is a shape co
 
 ## ABB6700Facade
 
-The single host-facing entry point for the ABB 6700 smart component. Implements the SmartComponent convention and adds component-specific typed commands (`setPose`, `setJointAngle`, `setTransitionDuration`). Its read surface is `getState()` (authored configuration) and `onViewModel()` (live values) — no separate pose accessor (see ADR-0006).
+The single host-facing entry point for the ABB 6700 smart component. Implements the SmartComponent convention and adds component-specific typed commands (`setPose`, `setJointAngle`, `setTransitionDuration`, `playPath`, `stopPath`). Its read surface is `getState()` (authored configuration) and `onViewModel()` (live values) — no separate pose accessor (see ADR-0006).
 
 Two-phase lifecycle (see ADR-0002):
 
@@ -122,9 +162,9 @@ _Avoid_: calling flat controllers (`setPose`, `createBabylonABB6700`, …) from 
 
 ## ABB6700Events
 
-The typed event catalog for `ABB6700Facade.onEvent()`. The ABB 6700 currently emits **no events** (`Record<never, never>`) — its behavior is command-and-view-model only. `onEvent` is implemented as a contract-complete no-op that returns a valid unsubscribe function, so the facade still satisfies the SmartComponent shape.
+The typed event catalog for `ABB6700Facade.onEvent()`. The ABB 6700 emits three events, all about a **path**: `pathSegmentReached`, `pathCompleted` and `pathStopped`. Their first caller is a host's weld sequencer, which fires the weld gun during a dwell and waits for a stopped arm to come to rest. Each event is also a standalone subscription controller (`onPathSegmentReached`, `onPathCompleted`, `onPathStopped`) for a host that holds no facade. Callbacks carry no payload: a subscriber reads the segment index from the VM's `path`.
 
-_Avoid_: adding domain events without a real host consumer — the component stays command/VM-driven until an event has a caller.
+_Avoid_: adding domain events without a real host consumer. Avoid putting data in an event's payload; read it from the VM.
 
 ---
 

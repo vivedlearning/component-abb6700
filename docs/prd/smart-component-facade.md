@@ -8,7 +8,7 @@ A consuming app that persists the arm's authored configuration has a second, sha
 
 ## Solution
 
-Introduce `ABB6700Facade` — a single host-facing class that wraps the ABB 6700's commands, state snapshot, and lifecycle. The facade implements the SmartComponent structural convention (`id`, `interfaceVersion`, `onEvent`, `onViewModel`, `load`, `destroy`, `getState`, `applyState`), giving hosts a uniform integration surface that works the same way across every smart component. The facade's domain is wired synchronously at construction with no Babylon dependency (the Babylon view is dynamically imported at `load()`), so tests and headless hosts can exercise the full command and state surface without a 3D context. The ABB 6700 currently emits no events, so `onEvent` is a contract-complete no-op.
+Introduce `ABB6700Facade` — a single host-facing class that wraps the ABB 6700's commands, state snapshot, and lifecycle. The facade implements the SmartComponent structural convention (`id`, `interfaceVersion`, `onEvent`, `onViewModel`, `load`, `destroy`, `getState`, `applyState`), giving hosts a uniform integration surface that works the same way across every smart component. The facade's domain is wired synchronously at construction with no Babylon dependency (the Babylon view is dynamically imported at `load()`), so tests and headless hosts can exercise the full command and state surface without a 3D context. `onEvent` returns a valid unsubscribe function for any event name, including one the ABB 6700 does not emit; the events it does emit are listed in `ABB6700Events`.
 
 The state snapshot is additionally reachable through standalone domain controllers — `getABB6700State` / `applyABB6700State` — so a consuming app's serializer can persist and restore an arm without constructing a facade. The facade's `getState` / `applyState` delegate to those controllers, keeping the two seams from drifting apart. Restoring is **best-effort forward-compatible**: a snapshot is never rejected for carrying an unfamiliar version, and any joint the snapshot omits falls back to that joint's entity default.
 
@@ -45,7 +45,7 @@ Reading live configuration is the view model's job (`onViewModel`) and reading a
     - the subscriber receives an update when a joint changes
     - the returned unsubscribe function stops further updates
 
-11. As a slide Activity, I want `facade.onEvent(...)` to return a valid unsubscribe function even though the ABB 6700 emits no events, so that the facade satisfies the SmartComponent contract uniformly.
+11. As a slide Activity, I want `facade.onEvent(...)` to return a valid unsubscribe function for any event name, including one the ABB 6700 does not emit, so that the facade satisfies the SmartComponent contract uniformly.
 
 ### Consuming app domain — state controllers
 
