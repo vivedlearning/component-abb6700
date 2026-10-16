@@ -129,7 +129,7 @@ Every facade has these eight members with this exact shape:
 | `setPose`       | `(pose: ABB6700Pose, options?: ABB6700TransitionOption) => void` | Set all six joints atomically. |
 | `setJointAngle` | `(joint: ABB6700Joint, angle: Angle, options?: ABB6700TransitionOption) => void` | Set a single joint. |
 | `setTransitionDuration` | `(ms: number) => void`                     | Set how long the rendered arm takes to ease to each new pose. Default 1000; `0` disables transitions. |
-| `playPath`      | `(segments: ABB6700PathSegment[]) => void`         | Play an ordered list of segments (a pose, `durationMs`, optional `dwellMs`) as one motion. **Beyond contract v1**; additive. |
+| `playPath`      | `(segments: readonly ABB6700PathSegment[]) => void` | Play an ordered list of segments (a pose, `durationMs`, optional `dwellMs`) as one motion. **Beyond contract v1**; additive. |
 | `stopPath`      | `(options?: ABB6700StopPathOptions) => void`       | Stop the path in flight: the arm slows to rest and the rest pose is committed. `{ durationMs }` sets the stop duration (default 400). **Beyond contract v1**; additive. |
 
 Commands return `void`. Pose commands are never blocked. `setPose`, `setJointAngle` and `applyState` take an optional `{ transition: "none" | "transition" }` (see *Snap commands* below). `setTransitionDuration` rejects a negative or non-finite value with a warning and keeps the previous duration. To read state, use `getState()` or `onViewModel` — the facade has no separate pose accessor.
