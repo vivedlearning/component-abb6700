@@ -55,6 +55,7 @@ import { BabylonEntity } from "@vived/app";
 import { makeABB6700FeatureFactory } from "./Domain/Factory/ABB6700FeatureFactory";
 import { ABB6700Entity } from "./Domain/Entities/ABB6700Entity";
 import { reportPathSegmentReached } from "./Domain/Controllers/reportPathSegmentReached";
+import { reportPathStopped } from "./Domain/Controllers/reportPathStopped";
 import type { ABB6700VM } from "./Domain/PMs/ABB6700PM";
 import { ABB6700BabylonView } from "./Frameworks/Babylon/ABB6700BabylonView";
 import {
@@ -211,6 +212,40 @@ describe("ABB6700Facade", () => {
 
     expect(reached).toHaveBeenCalledTimes(1);
     expect(completed).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops a path: reports the stopping phase and the requested duration on the view model", () => {
+    const facade = new ABB6700Facade("arm-1", appObjects);
+    let path: ABB6700VM["path"];
+    facade.onViewModel((vm) => {
+      path = vm.path;
+    });
+    facade.playPath([{ pose: makePose(10), durationMs: 500, dwellMs: 100 }]);
+
+    facade.stopPath({ durationMs: 300 });
+
+    expect(path).toMatchObject({ phase: "stopping", stopDurationMs: 300 });
+    expect(facade.getState().j1).toBe(10);
+  });
+
+  it("routes pathStopped to the path stop subscription", () => {
+    const facade = new ABB6700Facade("arm-1", appObjects);
+    const stopped = vi.fn();
+    const stopStopped = facade.onEvent("pathStopped", stopped);
+
+    facade.playPath([{ pose: makePose(10), durationMs: 500 }]);
+    facade.stopPath();
+    reportPathStopped("arm-1", appObjects, 1, makePose(15));
+
+    expect(stopped).toHaveBeenCalledTimes(1);
+    expect(facade.getState().j1).toBe(15);
+
+    stopStopped();
+    facade.playPath([{ pose: makePose(10), durationMs: 500 }]);
+    facade.stopPath();
+    reportPathStopped("arm-1", appObjects, 2, makePose(15));
+
+    expect(stopped).toHaveBeenCalledTimes(1);
   });
 
   it("returns a no-op unsubscribe for an event name it does not know", () => {

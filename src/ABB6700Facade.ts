@@ -5,12 +5,17 @@ import { createABB6700 } from "./Domain/Controllers/createABB6700";
 import { getABB6700State } from "./Domain/Controllers/getABB6700State";
 import { onPathCompleted } from "./Domain/Controllers/onPathCompleted";
 import { onPathSegmentReached } from "./Domain/Controllers/onPathSegmentReached";
+import { onPathStopped } from "./Domain/Controllers/onPathStopped";
 import { playPath } from "./Domain/Controllers/playPath";
 import { setJointAngle } from "./Domain/Controllers/setJointAngle";
 import { setPose } from "./Domain/Controllers/setPose";
 import { setTransitionDuration } from "./Domain/Controllers/setTransitionDuration";
+import { stopPath } from "./Domain/Controllers/stopPath";
 import { ABB6700Entity } from "./Domain/Entities/ABB6700Entity";
-import type { ABB6700PathSegment } from "./Domain/Entities/ABB6700Path";
+import type {
+  ABB6700PathSegment,
+  ABB6700StopPathOptions,
+} from "./Domain/Entities/ABB6700Path";
 import type { ABB6700VM } from "./Domain/PMs/ABB6700PM";
 import type { ABB6700Joint } from "./Domain/UCs/SetJointAngleUC";
 import type {
@@ -87,6 +92,10 @@ export class ABB6700Facade implements SmartComponent {
     playPath(this.id, segments, this.appObjects);
   }
 
+  stopPath(options?: ABB6700StopPathOptions): void {
+    stopPath(this.id, this.appObjects, options);
+  }
+
   getState(): ABB6700State {
     return getABB6700State(this.id, this.appObjects, ABB_6700_STATE_VERSION);
   }
@@ -103,6 +112,8 @@ export class ABB6700Facade implements SmartComponent {
         return onPathSegmentReached(this.id, this.appObjects, cb as () => void);
       case "pathCompleted":
         return onPathCompleted(this.id, this.appObjects, cb as () => void);
+      case "pathStopped":
+        return onPathStopped(this.id, this.appObjects, cb as () => void);
       default:
         return () => {};
     }

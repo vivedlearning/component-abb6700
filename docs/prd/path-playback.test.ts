@@ -8,13 +8,22 @@ import {
 } from "../../src/ABB6700Facade";
 import { aBB6700PMAdapter } from "../../src/Domain/Adapters/aBB6700PMAdapter";
 import type { ABB6700VM } from "../../src/Domain/PMs/ABB6700PM";
-import type { ABB6700PathSegment, ABB6700Pose } from "../../src";
+import {
+  ABB_6700_DEFAULT_STOP_DURATION_MS,
+  type ABB6700PathSegment,
+  type ABB6700Pose,
+  type ABB6700StopPathOptions,
+  type SmartComponent,
+} from "../../src";
 import { applyABB6700State } from "../../src/Domain/Controllers/applyABB6700State";
 import { playPath } from "../../src/Domain/Controllers/playPath";
 import { onPathCompleted } from "../../src/Domain/Controllers/onPathCompleted";
 import { onPathSegmentReached } from "../../src/Domain/Controllers/onPathSegmentReached";
+import { onPathStopped } from "../../src/Domain/Controllers/onPathStopped";
 import { reportPathSegmentReached } from "../../src/Domain/Controllers/reportPathSegmentReached";
 import { reportPathDwellEnded } from "../../src/Domain/Controllers/reportPathDwellEnded";
+import { reportPathStopped } from "../../src/Domain/Controllers/reportPathStopped";
+import { stopPath } from "../../src/Domain/Controllers/stopPath";
 
 const JOINTS = ["j1", "j2", "j3", "j4", "j5", "j6"] as const;
 
@@ -34,6 +43,8 @@ const P1 = poseOf(20);
 const P2 = poseOf(30);
 // A pose a host commands mid-path; no segment uses it.
 const Q = poseOf(50);
+// The pose a stopped arm rests at, between P1 and P2.
+const R = poseOf(25);
 
 const segment = (pose: ABB6700Pose, dwellMs?: number): ABB6700PathSegment =>
   dwellMs === undefined
@@ -54,9 +65,9 @@ describe("PRD: path-playback", () => {
     facade = new ABB6700Facade("arm-1", appObjects);
   });
 
-  function readVM(): () => ABB6700VM | undefined {
+  function readVM(id = "arm-1"): () => ABB6700VM | undefined {
     let vm: ABB6700VM | undefined;
-    aBB6700PMAdapter.subscribe("arm-1", appObjects, (v) => {
+    aBB6700PMAdapter.subscribe(id, appObjects, (v) => {
       vm = v;
     });
     return () => vm;
@@ -72,6 +83,8 @@ describe("PRD: path-playback", () => {
     return {
       reached,
       dwellEnded,
+      rested: (pose: ABB6700Pose) =>
+        reportPathStopped("arm-1", appObjects, playCount(), pose),
       // Reaches, then ends the dwell of, the first `count` segments in order.
       playThrough: (count: number) => {
         for (let i = 0; i < count; i++) {
@@ -481,21 +494,124 @@ describe("PRD: path-playback", () => {
     it.skip("stabilizer: the stabilizer linkage stays attached throughout");
   });
 
-  it.todo(
-    "story-8: As a Student, I want each arm's path to play independently, so that one arm's program never moves, stops or interrupts another arm.",
-  );
+  it("story-8: As a Student, I want each arm's path to play independently, so that one arm's program never moves, stops or interrupts another arm.", () => {
+    const secondArm = new ABB6700Facade("arm-2", appObjects);
+    const vm = readVM();
+    const view = viewOf(vm);
+    const secondVM = readVM("arm-2");
+    const reached = vi.fn();
+    const completed = vi.fn();
+    const stopped = vi.fn();
+    secondArm.onEvent("pathSegmentReached", reached);
+    secondArm.onEvent("pathCompleted", completed);
+    secondArm.onEvent("pathStopped", stopped);
+    const idle = secondVM();
+    const idleState = secondArm.getState();
+
+    // An idle arm: arm-1 plays a path, stops it and comes to rest.
+    facade.playPath(makeSegments());
+    view.reached(0);
+    view.dwellEnded(0);
+    facade.stopPath();
+    view.rested(R);
+
+    expect(vm()).toHaveProperty("path", undefined);
+    expect(degreesOf(vm()!)).toEqual(degreesOf(R));
+    expect(secondVM()).toEqual(idle);
+    expect(secondVM()).toHaveProperty("path", undefined);
+    expect(secondArm.getState()).toEqual(idleState);
+
+    // An arm on its own path: arm-1 plays and stops again.
+    secondArm.playPath(makeSegments());
+    const playing = secondVM();
+    expect(playing?.path).toMatchObject({ segmentIndex: 0, phase: "moving" });
+
+    facade.playPath(makeSegments());
+    view.reached(0);
+    facade.stopPath();
+    view.rested(R);
+
+    expect(secondVM()).toEqual(playing);
+    expect(reached).not.toHaveBeenCalled();
+    expect(completed).not.toHaveBeenCalled();
+    expect(stopped).not.toHaveBeenCalled();
+  });
 
   describe("story-9: As a host, I want to stop a path in flight, so that an Emergency Stop or a controller power-off halts the arm partway through a move.", () => {
-    it.todo("facade: `stopPath` on the facade stops the path");
-    it.todo(
-      "controller: the standalone `stopPath` controller stops the path for a host that holds no facade",
-    );
-    it.todo(
-      "stopping: from the stop request until the arm is at rest, the view model's `path` is in its stopping phase and the committed pose stays the current segment's",
-    );
-    it.todo(
-      "drops-rest: after a stop request, no further segment starts and neither `pathSegmentReached` nor `pathCompleted` fires",
-    );
+    it("facade: `stopPath` on the facade stops the path", () => {
+      const vm = readVM();
+      const view = viewOf(vm);
+      facade.playPath(makeSegments());
+      view.reached(0);
+      view.dwellEnded(0);
+      expect(vm()?.path).toMatchObject({ segmentIndex: 1, phase: "moving" });
+
+      facade.stopPath();
+
+      expect(vm()?.path).toMatchObject({ segmentIndex: 1, phase: "stopping" });
+    });
+    it("controller: the standalone `stopPath` controller stops the path for a host that holds no facade", () => {
+      const vm = readVM();
+      const view = viewOf(vm);
+      facade.playPath(makeSegments());
+      view.reached(0);
+      view.dwellEnded(0);
+      expect(vm()?.path).toMatchObject({ segmentIndex: 1, phase: "moving" });
+
+      stopPath("arm-1", appObjects);
+
+      expect(vm()?.path).toMatchObject({ segmentIndex: 1, phase: "stopping" });
+    });
+    it("stopping: from the stop request until the arm is at rest, the view model's `path` is in its stopping phase and the committed pose stays the current segment's", () => {
+      const vm = readVM();
+      const view = viewOf(vm);
+      facade.playPath(makeSegments());
+      view.reached(0);
+      view.dwellEnded(0);
+
+      facade.stopPath();
+
+      expect(vm()?.path).toMatchObject({ segmentIndex: 1, phase: "stopping" });
+      expect(degreesOf(vm()!)).toEqual(degreesOf(P1));
+      expect(facade.getState()).toMatchObject({ j1: 20, j6: 25 });
+    });
+    it("drops-rest: after a stop request, no further segment starts and neither `pathSegmentReached` nor `pathCompleted` fires", () => {
+      const vm = readVM();
+      const view = viewOf(vm);
+      const reached = vi.fn();
+      const completed = vi.fn();
+      facade.onEvent("pathSegmentReached", reached);
+      facade.onEvent("pathCompleted", completed);
+      facade.playPath(makeSegments());
+      view.reached(0);
+      view.dwellEnded(0);
+      expect(reached).toHaveBeenCalledTimes(1);
+
+      // Stopped while moving: the view's late reports change nothing.
+      facade.stopPath();
+      view.reached(1);
+      view.dwellEnded(1);
+      view.reached(2);
+      view.dwellEnded(2);
+
+      expect(reached).toHaveBeenCalledTimes(1);
+      expect(completed).not.toHaveBeenCalled();
+      expect(vm()?.path).toMatchObject({ segmentIndex: 1, phase: "stopping" });
+      expect(degreesOf(vm()!)).toEqual(degreesOf(P1));
+
+      // Stopped while dwelling: the dwell's end does not start the next segment.
+      facade.playPath(makeSegments());
+      view.reached(0);
+      expect(reached).toHaveBeenCalledTimes(2);
+      facade.stopPath();
+      view.dwellEnded(0);
+      view.reached(1);
+
+      expect(reached).toHaveBeenCalledTimes(2);
+      expect(completed).not.toHaveBeenCalled();
+      expect(vm()?.path).toMatchObject({ segmentIndex: 0, phase: "stopping" });
+      expect(degreesOf(vm()!)).toEqual(degreesOf(P0));
+    });
   });
 
   describe("story-10: As a Student, I want a stopped arm to slow to rest from where it is on screen, so that a stop looks like a robot braking rather than a freeze or a finished move.", () => {
@@ -518,41 +634,204 @@ describe("PRD: path-playback", () => {
   });
 
   describe("story-11: As a host, I want the pose a stopped arm rests at committed and announced, so that the view model, `getState()` and my sequencer agree on where the arm is.", () => {
-    it.todo(
-      "commits-rest: when the arm comes to rest, the view model and `getState()` hold the pose it rests at",
-    );
-    it.todo(
-      "stopped-event: `pathStopped` fires once, after the rest pose is committed",
-    );
-    it.todo(
-      "idle-after: when `pathStopped` fires, the view model reports no path in progress",
-    );
-    it.todo(
-      "both-surfaces: the event is available through the facade's `onEvent` and through a standalone subscription controller",
-    );
+    it("commits-rest: when the arm comes to rest, the view model and `getState()` hold the pose it rests at", () => {
+      const vm = readVM();
+      const view = viewOf(vm);
+      facade.playPath(makeSegments());
+      view.reached(0);
+      view.dwellEnded(0);
+      facade.stopPath();
+
+      view.rested(R);
+
+      expect(degreesOf(vm()!)).toEqual(degreesOf(R));
+      expect(facade.getState()).toEqual({
+        version: ABB_6700_STATE_VERSION,
+        j1: 25,
+        j2: 26,
+        j3: 27,
+        j4: 28,
+        j5: 29,
+        j6: 30,
+      });
+    });
+    it("stopped-event: `pathStopped` fires once, after the rest pose is committed", () => {
+      const vm = readVM();
+      const view = viewOf(vm);
+      const jointsAtCall: number[][] = [];
+      onPathStopped("arm-1", appObjects, () => {
+        jointsAtCall.push(degreesOf(vm()!));
+      });
+      facade.playPath(makeSegments());
+      view.reached(0);
+      view.dwellEnded(0);
+      facade.stopPath();
+      expect(jointsAtCall).toEqual([]);
+
+      view.rested(R);
+
+      expect(jointsAtCall).toEqual([degreesOf(R)]);
+    });
+    it("idle-after: when `pathStopped` fires, the view model reports no path in progress", () => {
+      const vm = readVM();
+      const view = viewOf(vm);
+      let vmInCallback: ABB6700VM | undefined;
+      onPathStopped("arm-1", appObjects, () => {
+        vmInCallback = vm();
+      });
+      facade.playPath(makeSegments());
+      view.reached(0);
+      view.dwellEnded(0);
+      facade.stopPath();
+
+      view.rested(R);
+
+      expect(vmInCallback).toBeDefined();
+      expect(vmInCallback).toHaveProperty("path", undefined);
+      expect(vm()).toHaveProperty("path", undefined);
+    });
+    it("both-surfaces: the event is available through the facade's `onEvent` and through a standalone subscription controller", () => {
+      const vm = readVM();
+      const view = viewOf(vm);
+      const viaFacade = vi.fn();
+      const viaController = vi.fn();
+      facade.onEvent("pathStopped", viaFacade);
+      onPathStopped("arm-1", appObjects, viaController);
+      facade.playPath(makeSegments());
+      view.reached(0);
+      view.dwellEnded(0);
+      facade.stopPath();
+
+      view.rested(R);
+
+      expect(viaFacade).toHaveBeenCalledTimes(1);
+      expect(viaController).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("story-12: As a host, I want to choose how long a stop takes, so that the stop matches the halt I am showing.", () => {
-    it.todo(
-      "default: the default stop duration is 400 ms, and the package exports that number and the stop options type so a host can use the same values",
-    );
-    it.todo(
-      "per-request: a stop duration passed with the request is used for that stop",
-    );
-    it.todo(
-      "invalid: a negative or non-finite stop duration is replaced by the default with a warning, and the stop still happens",
-    );
+    it("default: the default stop duration is 400 ms, and the package exports that number and the stop options type so a host can use the same values", () => {
+      const vm = readVM();
+      const view = viewOf(vm);
+      facade.playPath(makeSegments());
+      view.reached(0);
+
+      facade.stopPath();
+
+      expect(ABB_6700_DEFAULT_STOP_DURATION_MS).toBe(400);
+      expect(vm()?.path).toMatchObject({
+        phase: "stopping",
+        stopDurationMs: 400,
+      });
+
+      // A host can pass the exported number back, typed with the exported type.
+      const options: ABB6700StopPathOptions = {
+        durationMs: ABB_6700_DEFAULT_STOP_DURATION_MS,
+      };
+      facade.playPath(makeSegments());
+      facade.stopPath(options);
+
+      expect(vm()?.path).toMatchObject({
+        phase: "stopping",
+        stopDurationMs: 400,
+      });
+    });
+    it("per-request: a stop duration passed with the request is used for that stop", () => {
+      const vm = readVM();
+      const view = viewOf(vm);
+      facade.playPath(makeSegments());
+      view.reached(0);
+
+      facade.stopPath({ durationMs: 300 });
+
+      expect(vm()?.path).toMatchObject({
+        phase: "stopping",
+        stopDurationMs: 300,
+      });
+
+      // The standalone controller takes the same option.
+      facade.playPath(makeSegments());
+      stopPath("arm-1", appObjects, { durationMs: 250 });
+
+      expect(vm()?.path).toMatchObject({
+        phase: "stopping",
+        stopDurationMs: 250,
+      });
+    });
+    it("invalid: a negative or non-finite stop duration is replaced by the default with a warning, and the stop still happens", () => {
+      const warnSpy = vi.spyOn(appObjects, "submitWarning");
+      const vm = readVM();
+      const view = viewOf(vm);
+
+      for (const bad of [-1, NaN, Infinity]) {
+        warnSpy.mockClear();
+        facade.playPath(makeSegments());
+        view.reached(0);
+
+        facade.stopPath({ durationMs: bad });
+
+        expect(warnSpy).toHaveBeenCalledTimes(1);
+        expect(vm()?.path).toMatchObject({
+          phase: "stopping",
+          stopDurationMs: ABB_6700_DEFAULT_STOP_DURATION_MS,
+        });
+      }
+    });
     // View-only — frame timing and joint-node motion live in the Babylon view, not the VM
     it.skip("zero: a stop duration of zero stops the arm where it is");
   });
 
   describe("story-13: As a host, I want a stop request that has nothing to stop to change nothing, so that a stop never moves an idle arm or announces a stop that did not happen.", () => {
-    it.todo(
-      "idle: with no path in progress, `stopPath` changes nothing and fires no event",
-    );
-    it.todo(
-      "repeat: a stop request while the arm is already stopping changes nothing, and `pathStopped` still fires once",
-    );
+    it("idle: with no path in progress, `stopPath` changes nothing and fires no event", () => {
+      const warnSpy = vi.spyOn(appObjects, "submitWarning");
+      const vm = readVM();
+      const view = viewOf(vm);
+      const stopped = vi.fn();
+      facade.onEvent("pathStopped", stopped);
+      facade.setPose(Q);
+      const idle = vm();
+
+      facade.stopPath();
+      stopPath("arm-1", appObjects, { durationMs: -1 });
+
+      expect(vm()).toEqual(idle);
+      expect(facade.getState()).toMatchObject({ j1: 50, j6: 55 });
+
+      // A path that has completed leaves nothing to stop either.
+      facade.playPath(makeSegments());
+      view.playThrough(3);
+      const completed = vm();
+
+      facade.stopPath();
+
+      expect(vm()).toEqual(completed);
+      expect(stopped).not.toHaveBeenCalled();
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+    it("repeat: a stop request while the arm is already stopping changes nothing, and `pathStopped` still fires once", () => {
+      const vm = readVM();
+      const view = viewOf(vm);
+      const stopped = vi.fn();
+      facade.onEvent("pathStopped", stopped);
+      facade.playPath(makeSegments());
+      view.reached(0);
+      view.dwellEnded(0);
+      facade.stopPath({ durationMs: 300 });
+      const stopping = vm();
+
+      facade.stopPath();
+      stopPath("arm-1", appObjects, { durationMs: 150 });
+
+      expect(vm()).toEqual(stopping);
+      expect(vm()?.path).toMatchObject({
+        phase: "stopping",
+        stopDurationMs: 300,
+      });
+
+      view.rested(R);
+
+      expect(stopped).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("story-14: As a host, I want any pose command to cancel a path in progress, so that a slide change or a snap always takes over from a running path.", () => {
@@ -642,12 +921,59 @@ describe("PRD: path-playback", () => {
       expect(vm()?.snapCount).toBe(snapCount + 2);
       expect(vm()?.j3.degrees).toBe(99);
     });
-    it.todo(
-      "silent: a cancelled path fires no further events, and the view model reports no path in progress",
-    );
-    it.todo(
-      "during-stop: a pose command while the arm is stopping ends the stop; the commanded pose wins and `pathStopped` does not fire",
-    );
+    it("silent: a cancelled path fires no further events, and the view model reports no path in progress", () => {
+      const vm = readVM();
+      const view = viewOf(vm);
+      const reached = vi.fn();
+      const completed = vi.fn();
+      const stopped = vi.fn();
+      facade.onEvent("pathSegmentReached", reached);
+      facade.onEvent("pathCompleted", completed);
+      facade.onEvent("pathStopped", stopped);
+      facade.playPath(makeSegments());
+      view.reached(0);
+      view.dwellEnded(0);
+      const { playCount } = vm()!.path!;
+      expect(reached).toHaveBeenCalledTimes(1);
+
+      facade.setPose(Q);
+      const cancelled = vm();
+      expect(cancelled).toHaveProperty("path", undefined);
+
+      // The view's late reports for the cancelled path change nothing.
+      reportPathSegmentReached("arm-1", appObjects, playCount, 1);
+      reportPathDwellEnded("arm-1", appObjects, playCount, 1);
+      reportPathStopped("arm-1", appObjects, playCount, R);
+
+      expect(vm()).toEqual(cancelled);
+      expect(reached).toHaveBeenCalledTimes(1);
+      expect(completed).not.toHaveBeenCalled();
+      expect(stopped).not.toHaveBeenCalled();
+    });
+    it("during-stop: a pose command while the arm is stopping ends the stop; the commanded pose wins and `pathStopped` does not fire", () => {
+      const vm = readVM();
+      const view = viewOf(vm);
+      const stopped = vi.fn();
+      facade.onEvent("pathStopped", stopped);
+      facade.playPath(makeSegments());
+      view.reached(0);
+      view.dwellEnded(0);
+      facade.stopPath();
+      const { playCount } = vm()!.path!;
+      expect(vm()?.path).toMatchObject({ phase: "stopping" });
+
+      facade.setPose(Q);
+
+      expect(vm()).toHaveProperty("path", undefined);
+      expect(degreesOf(vm()!)).toEqual(degreesOf(Q));
+
+      // The view had not yet reported the rest pose; its late report is ignored.
+      reportPathStopped("arm-1", appObjects, playCount, R);
+
+      expect(degreesOf(vm()!)).toEqual(degreesOf(Q));
+      expect(facade.getState()).toMatchObject({ j1: 50, j6: 55 });
+      expect(stopped).not.toHaveBeenCalled();
+    });
   });
 
   describe("story-15: As a host, I want a new path to replace the one in progress, so that I can change the program without stopping first.", () => {
@@ -667,7 +993,42 @@ describe("PRD: path-playback", () => {
       expect(degreesOf(vm()!)).toEqual(degreesOf(Q));
       expect(facade.getState()).toMatchObject({ j1: 50, j6: 55 });
     });
-    it.todo("silent: the replaced path fires no further events");
+    it("silent: the replaced path fires no further events", () => {
+      const vm = readVM();
+      const view = viewOf(vm);
+      const reached = vi.fn();
+      const completed = vi.fn();
+      const stopped = vi.fn();
+      facade.onEvent("pathSegmentReached", reached);
+      facade.onEvent("pathCompleted", completed);
+      facade.onEvent("pathStopped", stopped);
+      facade.playPath(makeSegments());
+      view.reached(0);
+      view.dwellEnded(0);
+      const replacedPlayCount = vm()!.path!.playCount;
+      facade.playPath([segment(Q, 100), segment(P0)]);
+      const moving = vm();
+      expect(reached).toHaveBeenCalledTimes(1);
+
+      // The view's late reports for the replaced path change nothing, in each phase.
+      reportPathSegmentReached("arm-1", appObjects, replacedPlayCount, 0);
+      expect(vm()).toEqual(moving);
+      expect(reached).toHaveBeenCalledTimes(1);
+
+      view.reached(0);
+      const dwelling = vm();
+      expect(dwelling?.path).toMatchObject({ segmentIndex: 0, phase: "dwelling" });
+      reportPathDwellEnded("arm-1", appObjects, replacedPlayCount, 0);
+      expect(vm()).toEqual(dwelling);
+      expect(completed).not.toHaveBeenCalled();
+
+      facade.stopPath();
+      const stopping = vm();
+      reportPathStopped("arm-1", appObjects, replacedPlayCount, R);
+      expect(vm()).toEqual(stopping);
+      expect(stopped).not.toHaveBeenCalled();
+      expect(vm()?.path?.playCount).not.toBe(replacedPlayCount);
+    });
     // View-only — frame timing and joint-node motion live in the Babylon view, not the VM
     it.skip("from-screen: the new path starts from the angles on screen");
   });
@@ -750,16 +1111,94 @@ describe("PRD: path-playback", () => {
   });
 
   describe("story-18: As a host, I want `destroy()` or a remount during a path to end cleanly, so that tearing down mid-path never throws or writes to disposed nodes.", () => {
-    it.todo(
-      "destroy: `destroy()` during a path or a stop never throws, and no event fires afterwards",
-    );
+    it("destroy: `destroy()` during a path or a stop never throws, and no event fires afterwards", () => {
+      const reached = vi.fn();
+      const completed = vi.fn();
+      const stopped = vi.fn();
+      const subscribeAll = (arm: ABB6700Facade) => {
+        arm.onEvent("pathSegmentReached", reached);
+        arm.onEvent("pathCompleted", completed);
+        arm.onEvent("pathStopped", stopped);
+      };
+
+      // During a path: the view's late reports find no arm.
+      subscribeAll(facade);
+      const vm = readVM();
+      facade.playPath([segment(P0, 100)]);
+      const pathPlayCount = vm()!.path!.playCount;
+
+      expect(() => facade.destroy()).not.toThrow();
+      expect(() => {
+        reportPathSegmentReached("arm-1", appObjects, pathPlayCount, 0);
+        reportPathDwellEnded("arm-1", appObjects, pathPlayCount, 0);
+        reportPathStopped("arm-1", appObjects, pathPlayCount, R);
+      }).not.toThrow();
+
+      // During a stop, on a fresh arm.
+      const rearmed = new ABB6700Facade("arm-1", appObjects);
+      subscribeAll(rearmed);
+      const rearmedVM = readVM();
+      rearmed.playPath(makeSegments());
+      rearmed.stopPath();
+      const stopPlayCount = rearmedVM()!.path!.playCount;
+      expect(rearmedVM()?.path).toMatchObject({ phase: "stopping" });
+
+      expect(() => rearmed.destroy()).not.toThrow();
+      expect(() => {
+        reportPathStopped("arm-1", appObjects, stopPlayCount, R);
+        reportPathSegmentReached("arm-1", appObjects, stopPlayCount, 0);
+        reportPathDwellEnded("arm-1", appObjects, stopPlayCount, 0);
+      }).not.toThrow();
+
+      expect(reached).not.toHaveBeenCalled();
+      expect(completed).not.toHaveBeenCalled();
+      expect(stopped).not.toHaveBeenCalled();
+    });
     // View-only — frame timing and joint-node motion live in the Babylon view, not the VM
     it.skip(
       "remount: after a remount during a path, the arm appears directly on the committed pose and the path plays on from there; during a stop, the stop ends on that pose",
     );
   });
 
-  it.todo(
-    "story-19: As a host, I want the path commands and events to extend the facade without breaking the SmartComponent contract, so that existing hosts compile and run unchanged.",
-  );
+  it("story-19: As a host, I want the path commands and events to extend the facade without breaking the SmartComponent contract, so that existing hosts compile and run unchanged.", () => {
+    const vm = readVM();
+    const view = viewOf(vm);
+    // The facade still fits the contract; the path commands are beyond it.
+    const component: SmartComponent = facade;
+    const eventNames = [
+      "pathSegmentReached",
+      "pathCompleted",
+      "pathStopped",
+    ] as const;
+    const calls: string[] = [];
+    const unsubscribers = eventNames.map((name) =>
+      component.onEvent(name, () => {
+        calls.push(name);
+      }),
+    );
+    for (const unsubscribe of unsubscribers) {
+      expect(unsubscribe).toEqual(expect.any(Function));
+    }
+
+    facade.playPath([segment(P0, 100)]);
+    view.playThrough(1);
+    facade.playPath(makeSegments());
+    facade.stopPath();
+    view.rested(R);
+
+    expect(calls).toEqual([
+      "pathSegmentReached",
+      "pathCompleted",
+      "pathStopped",
+    ]);
+
+    unsubscribers.forEach((unsubscribe) => unsubscribe());
+    facade.playPath([segment(P0, 100)]);
+    view.playThrough(1);
+    facade.playPath(makeSegments());
+    facade.stopPath();
+    view.rested(R);
+
+    expect(calls).toHaveLength(3);
+  });
 });

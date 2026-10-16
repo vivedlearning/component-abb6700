@@ -18,6 +18,7 @@ export type ABB6700State = {
 export type ABB6700Events = {
   pathSegmentReached: () => void;
   pathCompleted: () => void;
+  pathStopped: () => void;
 };
 
 /** The default joint angle, in degrees, for a joint absent from a snapshot. */

@@ -7,6 +7,7 @@ import { makePlayPathUC } from "../UCs/PlayPathUC";
 import { makeSetJointAngleUC } from "../UCs/SetJointAngleUC";
 import { makeSetPoseUC } from "../UCs/SetPoseUC";
 import { makeSetTransitionDurationUC } from "../UCs/SetTransitionDurationUC";
+import { makeStopPathUC } from "../UCs/StopPathUC";
 
 /**
  * Per-instance factory that creates Entity + PM for each component instance
@@ -33,6 +34,7 @@ export function setupABB6700InstanceFactory(appObjects: AppObjectRepo): void {
     makeSetPoseUC(ao);
     makeSetTransitionDurationUC(ao);
     makePlayPathUC(ao);
+    makeStopPathUC(ao);
     makeCalcStabilizerUC(ao);
     makeABB6700PM(ao);
     return entity;
