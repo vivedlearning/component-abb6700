@@ -8,11 +8,14 @@ import {
   type Observer,
 } from "@babylonjs/core";
 import { BabylonEntity } from "@vived/app";
-import { ABB6700VM } from "../../Domain/PMs/ABB6700PM";
+import { ABB6700VM, type ABB6700PathVM } from "../../Domain/PMs/ABB6700PM";
 import { aBB6700PMAdapter } from "../../Domain/Adapters/aBB6700PMAdapter";
 import componentConfig from "../../component.config";
 import { getABB6700AssetContainer } from "./ABB6700AssetCache";
 import { calcStabilizer } from "../../Domain/UCs/CalcStabilizerUC";
+import { reportPathSegmentReached } from "../../Domain/Controllers/reportPathSegmentReached";
+import { reportPathDwellEnded } from "../../Domain/Controllers/reportPathDwellEnded";
+import { reportPathStopped } from "../../Domain/Controllers/reportPathStopped";
 
 /** Six joint angles in radians, indexed j1..j6. */
 type Pose = [number, number, number, number, number, number];
@@ -24,8 +27,47 @@ interface Transition {
   elapsedMs: number;
 }
 
+/** A stop's rest pose, as reportPathStopped takes it. */
+type RestPose = Parameters<typeof reportPathStopped>[3];
+
+/**
+ * A stop in progress (ADR-0007): constant deceleration along the segment the
+ * arm was on, from its on-screen speed. u is the eased progress from -> to.
+ */
+interface PathStop {
+  from: Pose;
+  to: Pose;
+  /** Progress when the stop was requested. */
+  u0: number;
+  /** Progress per ms when the stop was requested. */
+  v: number;
+  durationMs: number;
+  elapsedMs: number;
+  /** Where the arm comes to rest. */
+  rest: Pose;
+}
+
+/**
+ * Where the view is in the path the domain is playing. The render loop is the
+ * path's only clock: it advances this and reports the three moments back.
+ */
+type PathPlay = { playCount: number; segmentIndex: number } & (
+  | { phase: "moving"; motion: Transition }
+  | { phase: "dwelling"; dwellMs: number; elapsedMs: number }
+  | { phase: "stopping"; stop: PathStop }
+);
+
 function posesEqual(a: Pose, b: Pose): boolean {
   return a.every((v, i) => v === b[i]);
+}
+
+/** True when every joint is within 1e-9 rad: equal but for float residue. */
+function posesNear(a: Pose, b: Pose): boolean {
+  return a.every((v, i) => Math.abs(v - b[i]) <= 1e-9);
+}
+
+function lerpPose(from: Pose, to: Pose, u: number): Pose {
+  return from.map((f, i) => f + (to[i] - f) * u) as Pose;
 }
 
 /** Ease-in-out: smoothstep. */
@@ -102,6 +144,13 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
   /** The pose currently written to the nodes, or undefined before the first render. */
   private rendered: Pose | undefined;
   private transition: Transition | undefined;
+  /** The path in progress, if the VM carries one. */
+  private pathPlay: PathPlay | undefined;
+  /**
+   * The overrun of the phase being reported, for the next phase of the same
+   * path to start with. Set only while a report is in progress.
+   */
+  private carry: { playCount: number; ms: number } | undefined;
   /** The last vm.snapCount seen, or undefined before the first VM. */
   private lastSnapCount: number | undefined;
   private scene: Scene | undefined;
@@ -157,11 +206,13 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
       );
     }
 
-    // A reload replaces the nodes. Drop any transition in flight and the
-    // rendered pose first, so the render observer attached below never
-    // advances the old transition onto disposed nodes while the new asset
-    // is still loading. bindMeshes() then snaps the new nodes to lastVM.
+    // A reload replaces the nodes. Drop any transition or path in flight and
+    // the rendered pose first, so the render observer attached below never
+    // advances the old motion onto disposed nodes while the new asset is
+    // still loading. bindMeshes() then snaps the new nodes to lastVM and
+    // picks the path up again.
     this.transition = undefined;
+    this.pathPlay = undefined;
     this.rendered = undefined;
 
     // Dispose previous instance if load is called again
@@ -291,13 +342,26 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
     }
 
     // A rebind (remount) must snap: forget whatever pose was rendered on the
-    // previous nodes and any transition in flight.
+    // previous nodes and any transition or path in flight.
     this.rendered = undefined;
     this.transition = undefined;
+    this.pathPlay = undefined;
 
     // Apply current state to the newly bound meshes
     if (this.lastVM) {
       this.applyView(this.lastVM);
+
+      // The arm now sits on the committed pose, so a path picks up from
+      // there: a moving segment counts as reached on the first frame, a dwell
+      // restarts, a stop rests where the arm is.
+      const path = this.lastVM.path;
+      if (path && this.rendered) {
+        this.applyPath(
+          path.phase === "moving" ? { ...path, durationMs: 0 } : path,
+          this.rendered,
+          this.rendered,
+        );
+      }
     }
   }
 
@@ -326,7 +390,14 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
       this.stabilizerPrismaticNode.position.z = extension;
   }
 
-  /** Write a pose directly to the nodes with no transition. */
+  /** Write a pose and the stabilizer derived from its J2. */
+  private writeArm(pose: Pose): void {
+    this.writeJoints(pose);
+    const stab = calcStabilizer(Angle.FromRadians(pose[1]));
+    this.writeStabilizer(stab.angle.radians, stab.extension);
+  }
+
+  /** Write a pose directly to the nodes with no transition or path motion. */
   private snapTo(target: Pose, vm: ABB6700VM): void {
     this.writeJoints(target);
     // Derive the stabilizer from J2 rather than trusting the VM's own values:
@@ -337,6 +408,7 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
     this.writeStabilizer(stab.angle.radians, stab.extension);
     this.rendered = target;
     this.transition = undefined;
+    this.pathPlay = undefined;
   }
 
   private applyView = (vm: ABB6700VM): void => {
@@ -368,6 +440,22 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
       return;
     }
 
+    // A path VM never starts a plain transition: the path's own motion
+    // follows its segment poses.
+    if (vm.path) {
+      this.applyPath(vm.path, target, this.rendered);
+      return;
+    }
+
+    // The path ended (completed, stopped or cancelled). After a stop the
+    // committed pose is the one the view reported, round-tripped through
+    // Angle, so it can differ from the rendered pose by float residue: keep
+    // what is on screen.
+    if (this.pathPlay) {
+      this.pathPlay = undefined;
+      if (posesNear(target, this.rendered)) return;
+    }
+
     // A VM whose joints match the current goal (the in-flight target, or
     // the rendered pose if nothing is in flight) is duration-only: it must
     // not retarget or re-time a transition.
@@ -391,8 +479,200 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
     };
   };
 
-  /** Per-frame render-loop step: advances the in-flight transition, if any. */
+  /**
+   * Follow the path VM. A change of (playCount, segmentIndex, phase) starts
+   * that phase; a VM with the same key only matters while moving, where the
+   * domain may still be writing the segment's pose joint by joint. While
+   * dwelling or stopping the domain writes the next pose or the rest pose
+   * before it changes the key, and the view must not retarget then.
+   */
+  private applyPath(path: ABB6700PathVM, target: Pose, rendered: Pose): void {
+    const play = this.pathPlay;
+    const { playCount, segmentIndex, phase } = path;
+    if (
+      play?.playCount === playCount &&
+      play.segmentIndex === segmentIndex &&
+      play.phase === phase
+    ) {
+      if (play.phase === "moving") play.motion.to = target;
+      return;
+    }
+
+    // The domain writes a new path's joints before it sets the path, so a
+    // plain transition may have just started. No frame has passed: drop it.
+    this.transition = undefined;
+
+    const key = { playCount, segmentIndex };
+    const carryMs = this.carry?.playCount === playCount ? this.carry.ms : 0;
+    switch (phase) {
+      case "moving":
+        this.pathPlay = {
+          ...key,
+          phase,
+          motion: {
+            from: rendered,
+            to: target,
+            durationMs: path.durationMs,
+            elapsedMs: carryMs,
+          },
+        };
+        break;
+      case "dwelling":
+        this.pathPlay = {
+          ...key,
+          phase,
+          dwellMs: path.dwellMs,
+          elapsedMs: carryMs,
+        };
+        break;
+      case "stopping":
+        this.pathPlay = {
+          ...key,
+          phase,
+          stop: this.planStop(rendered, path.stopDurationMs),
+        };
+        break;
+    }
+  }
+
+  /**
+   * Plan a stop from the segment motion on screen: constant deceleration from
+   * the current speed, never passing the segment's pose. With no motion to
+   * slow (dwelling, segment start, zero duration, zero stop time) the arm
+   * rests where it is.
+   */
+  private planStop(rendered: Pose, stopMs: number): PathStop {
+    const play = this.pathPlay;
+    const motion = play?.phase === "moving" ? play.motion : undefined;
+    if (motion && motion.durationMs > 0 && stopMs > 0) {
+      const t = Math.min(1, motion.elapsedMs / motion.durationMs);
+      const u0 = smoothstep(t);
+      const v = (6 * t * (1 - t)) / motion.durationMs;
+      if (v > 0) {
+        // The time at which this deceleration reaches the segment's pose.
+        const limitMs = (2 * (1 - u0)) / v;
+        const durationMs = Math.min(stopMs, limitMs);
+        const rest =
+          stopMs >= limitMs
+            ? motion.to
+            : lerpPose(motion.from, motion.to, u0 + (v * durationMs) / 2);
+        return {
+          from: motion.from,
+          to: motion.to,
+          u0,
+          v,
+          durationMs,
+          elapsedMs: 0,
+          rest,
+        };
+      }
+    }
+    return {
+      from: rendered,
+      to: rendered,
+      u0: 0,
+      v: 0,
+      durationMs: 0,
+      elapsedMs: 0,
+      rest: rendered,
+    };
+  }
+
+  /**
+   * Advance the path by one frame. Reports go out from here, never from the
+   * VM handler, so the domain is never re-entered while its PM is notifying.
+   * The domain answers a report with new VMs at once, which replace
+   * pathPlay: nothing here touches it after a report.
+   */
+  private stepPath(play: PathPlay): void {
+    const deltaMs = this.scene?.getEngine().getDeltaTime() ?? 0;
+    const { playCount, segmentIndex } = play;
+
+    switch (play.phase) {
+      case "moving": {
+        const motion = play.motion;
+        motion.elapsedMs += deltaMs;
+        if (motion.elapsedMs < motion.durationMs) {
+          const pose = lerpPose(
+            motion.from,
+            motion.to,
+            smoothstep(motion.elapsedMs / motion.durationMs),
+          );
+          this.writeArm(pose);
+          this.rendered = pose;
+          return;
+        }
+        // Arrive exactly: write the target verbatim, no float residue.
+        this.writeArm(motion.to);
+        this.rendered = motion.to;
+        this.report(playCount, motion.elapsedMs - motion.durationMs, () =>
+          reportPathSegmentReached(
+            this.appObject.id,
+            this.appObjects,
+            playCount,
+            segmentIndex,
+          ),
+        );
+        return;
+      }
+      case "dwelling": {
+        play.elapsedMs += deltaMs;
+        if (play.elapsedMs < play.dwellMs) return;
+        this.report(playCount, play.elapsedMs - play.dwellMs, () =>
+          reportPathDwellEnded(
+            this.appObject.id,
+            this.appObjects,
+            playCount,
+            segmentIndex,
+          ),
+        );
+        return;
+      }
+      case "stopping": {
+        const stop = play.stop;
+        stop.elapsedMs += deltaMs;
+        if (stop.elapsedMs < stop.durationMs) {
+          const tau = stop.elapsedMs;
+          const u =
+            stop.u0 +
+            stop.v * tau -
+            (stop.v * tau * tau) / (2 * stop.durationMs);
+          const pose = lerpPose(stop.from, stop.to, u);
+          this.writeArm(pose);
+          this.rendered = pose;
+          return;
+        }
+        const rest = stop.rest;
+        this.writeArm(rest);
+        this.rendered = rest;
+        const [j1, j2, j3, j4, j5, j6] = rest.map((r) => Angle.FromRadians(r));
+        const pose: RestPose = { j1, j2, j3, j4, j5, j6 };
+        reportPathStopped(this.appObject.id, this.appObjects, playCount, pose);
+        return;
+      }
+    }
+  }
+
+  /**
+   * Send a report. The overrun is carried to the next phase the domain starts
+   * on the same path while it answers, and to nothing after.
+   */
+  private report(playCount: number, overrunMs: number, send: () => void): void {
+    this.carry = { playCount, ms: overrunMs };
+    try {
+      send();
+    } finally {
+      this.carry = undefined;
+    }
+  }
+
+  /** Per-frame render-loop step: advances the path or transition in flight. */
   private onBeforeRender = (): void => {
+    if (this.pathPlay) {
+      this.stepPath(this.pathPlay);
+      return;
+    }
+
     const transition = this.transition;
     if (!transition) return;
 
@@ -401,9 +681,7 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
     const t = Math.min(1, transition.elapsedMs / transition.durationMs);
     const eased = smoothstep(t);
 
-    const interpolated = transition.from.map(
-      (from, i) => from + (transition.to[i] - from) * eased,
-    ) as Pose;
+    const interpolated = lerpPose(transition.from, transition.to, eased);
     this.writeJoints(interpolated);
     const stab = calcStabilizer(Angle.FromRadians(interpolated[1]));
     this.writeStabilizer(stab.angle.radians, stab.extension);
@@ -428,6 +706,7 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
     this.scene?.onBeforeRenderObservable?.remove(this.renderObserver);
     this.renderObserver = null;
     this.transition = undefined;
+    this.pathPlay = undefined;
     this.instantiatedEntries?.dispose();
     this._shadowCasters = [];
     this._nodesByObjectId = new Map<string, Node>();
