@@ -41,6 +41,54 @@ describe("SetJointAngleUC", () => {
     expect(entity["j6"].degrees).toBe(-45);
   });
 
+  describe("path cancellation", () => {
+    const startPath = () =>
+      entity.startPath([
+        {
+          pose: {
+            j1: Angle.FromDegrees(20),
+            j2: Angle.FromDegrees(21),
+            j3: Angle.FromDegrees(22),
+            j4: Angle.FromDegrees(23),
+            j5: Angle.FromDegrees(24),
+            j6: Angle.FromDegrees(25),
+          },
+          durationMs: 500,
+        },
+      ]);
+
+    it("cancels the path in progress", () => {
+      startPath();
+
+      uc.setAngle("j3", Angle.FromDegrees(45));
+
+      expect(entity.path).toBeUndefined();
+    });
+
+    it("cancels the path before writing the joint", () => {
+      startPath();
+      const before = entity.j3.degrees;
+      const seen: { path: unknown; j3: number }[] = [];
+      entity.addChangeObserver(() => {
+        seen.push({ path: entity.path, j3: entity.j3.degrees });
+      });
+
+      uc.setAngle("j3", Angle.FromDegrees(45));
+
+      // The first notification carries the cancel, with the old joint.
+      expect(seen[0]).toEqual({ path: undefined, j3: before });
+    });
+
+    it("cancels the path when snapping", () => {
+      startPath();
+
+      uc.setAngle("j3", Angle.FromDegrees(45), { transition: "none" });
+
+      expect(entity.path).toBeUndefined();
+      expect(entity.snapCount).toBe(1);
+    });
+  });
+
   describe("snap option", () => {
     it("does not increment snapCount when no options are given", () => {
       uc.setAngle("j1", Angle.FromDegrees(10));

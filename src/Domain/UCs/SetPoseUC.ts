@@ -53,6 +53,9 @@ class SetPoseUCImp extends SetPoseUC {
       this.warn("Missing ABB6700Entity");
       return;
     }
+    // A pose command cancels a path in progress, silently. Cancel first, so
+    // no VM pairs the path with the commanded joints.
+    entity.path = undefined;
     entity.j1 = pose.j1;
     entity.j2 = pose.j2;
     entity.j3 = pose.j3;

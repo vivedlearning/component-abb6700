@@ -49,6 +49,9 @@ class SetJointAngleUCImp extends SetJointAngleUC {
       this.warn("Missing ABB6700Entity");
       return;
     }
+    // A joint command cancels a path in progress, silently. Cancel first, so
+    // no VM pairs the path with the commanded joint.
+    entity.path = undefined;
     entity[joint] = angle;
 
     if (options?.transition === "none") {

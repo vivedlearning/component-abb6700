@@ -1,10 +1,15 @@
 import { describe, it, beforeEach, expect, vi } from "vitest";
 import { Angle, type AppObjectRepo } from "@vived/core";
 import { makeDomainForTesting } from "../../src/Domain/makeDomainForTesting";
-import { ABB6700Facade, ABB_6700_STATE_VERSION } from "../../src/ABB6700Facade";
+import {
+  ABB6700Facade,
+  ABB_6700_STATE_VERSION,
+  type ABB6700State,
+} from "../../src/ABB6700Facade";
 import { aBB6700PMAdapter } from "../../src/Domain/Adapters/aBB6700PMAdapter";
 import type { ABB6700VM } from "../../src/Domain/PMs/ABB6700PM";
 import type { ABB6700PathSegment, ABB6700Pose } from "../../src";
+import { applyABB6700State } from "../../src/Domain/Controllers/applyABB6700State";
 import { playPath } from "../../src/Domain/Controllers/playPath";
 import { onPathCompleted } from "../../src/Domain/Controllers/onPathCompleted";
 import { onPathSegmentReached } from "../../src/Domain/Controllers/onPathSegmentReached";
@@ -27,6 +32,8 @@ const degreesOf = (pose: ABB6700Pose) => JOINTS.map((j) => pose[j].degrees);
 const P0 = poseOf(10);
 const P1 = poseOf(20);
 const P2 = poseOf(30);
+// A pose a host commands mid-path; no segment uses it.
+const Q = poseOf(50);
 
 const segment = (pose: ABB6700Pose, dwellMs?: number): ABB6700PathSegment =>
   dwellMs === undefined
@@ -549,16 +556,92 @@ describe("PRD: path-playback", () => {
   });
 
   describe("story-14: As a host, I want any pose command to cancel a path in progress, so that a slide change or a snap always takes over from a running path.", () => {
-    it.todo(
-      "set-pose: `setPose` during a path cancels it; the commanded pose is committed and the arm transitions to it from the angles on screen",
-    );
-    it.todo("set-joint: `setJointAngle` during a path cancels it");
-    it.todo(
-      "apply-state: `applyState` on the facade and the `applyABB6700State` controller cancel a path in progress",
-    );
-    it.todo(
-      "snap: a pose command with the snap option during a path cancels it and snaps the arm to the commanded pose",
-    );
+    it("set-pose: `setPose` during a path cancels it; the commanded pose is committed and the arm transitions to it from the angles on screen", () => {
+      const vm = readVM();
+      const view = viewOf(vm);
+      facade.playPath(makeSegments());
+      view.reached(0);
+      view.dwellEnded(0);
+      expect(vm()?.path).toMatchObject({ segmentIndex: 1, phase: "moving" });
+      const snapCount = vm()!.snapCount;
+
+      facade.setPose(Q);
+
+      expect(vm()).toHaveProperty("path", undefined);
+      expect(degreesOf(vm()!)).toEqual(degreesOf(Q));
+      expect(facade.getState()).toMatchObject({ j1: 50, j6: 55 });
+      expect(vm()?.snapCount).toBe(snapCount);
+    });
+    it("set-joint: `setJointAngle` during a path cancels it", () => {
+      const vm = readVM();
+      const view = viewOf(vm);
+      facade.playPath(makeSegments());
+      view.reached(0);
+      view.dwellEnded(0);
+      expect(vm()?.path).toMatchObject({ segmentIndex: 1, phase: "moving" });
+
+      facade.setJointAngle("j3", Angle.FromDegrees(99));
+
+      expect(vm()).toHaveProperty("path", undefined);
+      // J3 takes the commanded angle; the other joints keep the segment's pose.
+      expect(degreesOf(vm()!)).toEqual(
+        degreesOf({ ...P1, j3: Angle.FromDegrees(99) }),
+      );
+    });
+    it("apply-state: `applyState` on the facade and the `applyABB6700State` controller cancel a path in progress", () => {
+      const vm = readVM();
+      const view = viewOf(vm);
+      const stateOf = (degrees: number): ABB6700State => ({
+        version: ABB_6700_STATE_VERSION,
+        j1: degrees,
+        j2: degrees + 1,
+        j3: degrees + 2,
+        j4: degrees + 3,
+        j5: degrees + 4,
+        j6: degrees + 5,
+      });
+      facade.playPath(makeSegments());
+      view.reached(0);
+      expect(vm()?.path).toMatchObject({ segmentIndex: 0, phase: "dwelling" });
+
+      facade.applyState(stateOf(60));
+
+      expect(vm()).toHaveProperty("path", undefined);
+      expect(facade.getState()).toEqual(stateOf(60));
+
+      facade.playPath(makeSegments());
+      expect(vm()?.path).toMatchObject({ segmentIndex: 0, phase: "moving" });
+
+      applyABB6700State("arm-1", appObjects, stateOf(70));
+
+      expect(vm()).toHaveProperty("path", undefined);
+      expect(facade.getState()).toEqual(stateOf(70));
+    });
+    it("snap: a pose command with the snap option during a path cancels it and snaps the arm to the commanded pose", () => {
+      const vm = readVM();
+      const view = viewOf(vm);
+      facade.playPath(makeSegments());
+      view.reached(0);
+      view.dwellEnded(0);
+      expect(vm()?.path).toMatchObject({ segmentIndex: 1, phase: "moving" });
+      const snapCount = vm()!.snapCount;
+
+      facade.setPose(Q, { transition: "none" });
+
+      expect(vm()).toHaveProperty("path", undefined);
+      expect(vm()?.snapCount).toBe(snapCount + 1);
+      expect(degreesOf(vm()!)).toEqual(degreesOf(Q));
+      expect(facade.getState()).toMatchObject({ j1: 50, j6: 55 });
+
+      facade.playPath(makeSegments());
+      expect(vm()?.path).toMatchObject({ segmentIndex: 0, phase: "moving" });
+
+      facade.setJointAngle("j3", Angle.FromDegrees(99), { transition: "none" });
+
+      expect(vm()).toHaveProperty("path", undefined);
+      expect(vm()?.snapCount).toBe(snapCount + 2);
+      expect(vm()?.j3.degrees).toBe(99);
+    });
     it.todo(
       "silent: a cancelled path fires no further events, and the view model reports no path in progress",
     );
@@ -568,9 +651,22 @@ describe("PRD: path-playback", () => {
   });
 
   describe("story-15: As a host, I want a new path to replace the one in progress, so that I can change the program without stopping first.", () => {
-    it.todo(
-      "replaces: the new path's first segment is committed and the view model's segment index starts again at 0",
-    );
+    it("replaces: the new path's first segment is committed and the view model's segment index starts again at 0", () => {
+      const vm = readVM();
+      const view = viewOf(vm);
+      facade.playPath(makeSegments());
+      view.reached(0);
+      view.dwellEnded(0);
+      expect(vm()?.path).toMatchObject({ segmentIndex: 1, phase: "moving" });
+      const firstPlayCount = vm()!.path!.playCount;
+
+      facade.playPath([segment(Q, 100), segment(P0)]);
+
+      expect(vm()?.path).toMatchObject({ segmentIndex: 0, phase: "moving" });
+      expect(vm()!.path!.playCount).not.toBe(firstPlayCount);
+      expect(degreesOf(vm()!)).toEqual(degreesOf(Q));
+      expect(facade.getState()).toMatchObject({ j1: 50, j6: 55 });
+    });
     it.todo("silent: the replaced path fires no further events");
     // View-only — frame timing and joint-node motion live in the Babylon view, not the VM
     it.skip("from-screen: the new path starts from the angles on screen");
