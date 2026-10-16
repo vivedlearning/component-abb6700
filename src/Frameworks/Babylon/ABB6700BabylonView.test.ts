@@ -138,6 +138,7 @@ function makeVM(overrides: Partial<ABB6700VM> = {}): ABB6700VM {
     stabilizerExtension: 0,
     transitionDurationMs: ABB_6700_DEFAULT_TRANSITION_DURATION_MS,
     snapCount: 0,
+    path: undefined,
     ...overrides,
   };
 }

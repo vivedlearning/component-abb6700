@@ -1,5 +1,22 @@
 import { Angle, AppObject, AppObjectPM, AppObjectRepo } from "@vived/core";
 import { ABB6700Entity } from "../Entities/ABB6700Entity";
+import type { ABB6700PathPhase } from "../Entities/ABB6700Path";
+
+/**
+ * The path in progress, as a view needs it: where the path is and the current
+ * segment's timing.
+ */
+export interface ABB6700PathVM {
+  playCount: number;
+  segmentIndex: number;
+  phase: ABB6700PathPhase;
+  /** The current segment's travel time. */
+  durationMs: number;
+  /** The current segment's dwell; 0 when the segment has none. */
+  dwellMs: number;
+  /** The stop's duration while phase is "stopping", else 0. */
+  stopDurationMs: number;
+}
 
 /**
  * View Model for ABB 6700 joint angle display.
@@ -16,6 +33,8 @@ export interface ABB6700VM {
   stabilizerExtension: number;
   transitionDurationMs: number;
   snapCount: number;
+  /** The path in progress, or undefined when none is. */
+  path: ABB6700PathVM | undefined;
 }
 
 /**
@@ -64,8 +83,39 @@ class ABB6700PMImp extends ABB6700PM {
       a.stabilizerAngle.degrees === b.stabilizerAngle.degrees &&
       a.stabilizerExtension === b.stabilizerExtension &&
       a.transitionDurationMs === b.transitionDurationMs &&
-      a.snapCount === b.snapCount
+      a.snapCount === b.snapCount &&
+      this.pathsAreEqual(a.path, b.path)
     );
+  }
+
+  private pathsAreEqual(
+    a: ABB6700PathVM | undefined,
+    b: ABB6700PathVM | undefined,
+  ): boolean {
+    if (a === undefined || b === undefined) return a === b;
+    return (
+      a.playCount === b.playCount &&
+      a.segmentIndex === b.segmentIndex &&
+      a.phase === b.phase &&
+      a.durationMs === b.durationMs &&
+      a.dwellMs === b.dwellMs &&
+      a.stopDurationMs === b.stopDurationMs
+    );
+  }
+
+  private buildPathVM(entity: ABB6700Entity): ABB6700PathVM | undefined {
+    const path = entity.path;
+    if (!path) return undefined;
+
+    const segment = path.segments[path.segmentIndex];
+    return {
+      playCount: path.playCount,
+      segmentIndex: path.segmentIndex,
+      phase: path.phase,
+      durationMs: segment.durationMs,
+      dwellMs: segment.dwellMs ?? 0,
+      stopDurationMs: path.stopDurationMs,
+    };
   }
 
   onEntityChange = (): void => {
@@ -84,6 +134,7 @@ class ABB6700PMImp extends ABB6700PM {
       stabilizerExtension: entity.stabilizerExtension,
       transitionDurationMs: entity.transitionDurationMs,
       snapCount: entity.snapCount,
+      path: this.buildPathVM(entity),
     };
 
     this.doUpdateView(viewModel);

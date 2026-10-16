@@ -15,11 +15,18 @@ export {
   makeABB6700Repo,
   type ABB6700EntityFactory,
 } from "./Domain/Entities/ABB6700Repo";
+export {
+  ABB_6700_DEFAULT_STOP_DURATION_MS,
+  type ABB6700PathPhase,
+  type ABB6700PathSegment,
+  type ABB6700StopPathOptions,
+} from "./Domain/Entities/ABB6700Path";
 
 // Presentation Managers
 export {
   ABB6700PM,
   makeABB6700PM,
+  type ABB6700PathVM,
   type ABB6700VM,
 } from "./Domain/PMs/ABB6700PM";
 

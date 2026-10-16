@@ -6,6 +6,7 @@ import {
   MemoizedAngle,
 } from "@vived/core";
 import { ABB_6700_DEFAULT_JOINT_DEGREES } from "./ABB6700State";
+import type { ABB6700PathProgress, ABB6700PathSegment } from "./ABB6700Path";
 
 /** The default pose-transition duration, in milliseconds, for a new instance. */
 export const ABB_6700_DEFAULT_TRANSITION_DURATION_MS = 1000;
@@ -53,6 +54,16 @@ export abstract class ABB6700Entity extends AppObjectEntity {
 
   /** Increments snapCount and notifies observers, even if nothing else changed. */
   abstract requestSnap(): void;
+
+  /** The path in progress, or undefined. Replaced on every change, never mutated. */
+  abstract get path(): ABB6700PathProgress | undefined;
+  abstract set path(val: ABB6700PathProgress | undefined);
+
+  /**
+   * Increments the play count, then records a new path at its first segment,
+   * moving. Does not write the joints.
+   */
+  abstract startPath(segments: readonly ABB6700PathSegment[]): void;
 
   static get(appObj: AppObject): ABB6700Entity | undefined {
     return appObj.getComponent<ABB6700Entity>(this.type);
@@ -114,6 +125,8 @@ class ABB6700EntityImp extends ABB6700Entity {
   private _stabilizerExtension = 0;
   private _transitionDurationMs = ABB_6700_DEFAULT_TRANSITION_DURATION_MS;
   private _snapCount = 0;
+  private _path: ABB6700PathProgress | undefined;
+  private _playCount = 0;
 
   get j1() {
     return this.memoizedJ1.val;
@@ -189,6 +202,26 @@ class ABB6700EntityImp extends ABB6700Entity {
   requestSnap(): void {
     this._snapCount++;
     this.notifyOnChange();
+  }
+
+  get path(): ABB6700PathProgress | undefined {
+    return this._path;
+  }
+  set path(val: ABB6700PathProgress | undefined) {
+    if (this._path === val) return;
+    this._path = val;
+    this.notifyOnChange();
+  }
+
+  startPath(segments: readonly ABB6700PathSegment[]): void {
+    this._playCount++;
+    this.path = {
+      playCount: this._playCount,
+      segments: [...segments],
+      segmentIndex: 0,
+      phase: "moving",
+      stopDurationMs: 0,
+    };
   }
 
   constructor(appObject: AppObject) {

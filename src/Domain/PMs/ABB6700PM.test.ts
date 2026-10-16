@@ -5,7 +5,14 @@ import {
   makeABB6700Entity,
   ABB_6700_DEFAULT_TRANSITION_DURATION_MS,
 } from "../Entities/ABB6700Entity";
-import { ABB6700PM, ABB6700VM, makeABB6700PM } from "./ABB6700PM";
+import type { ABB6700PathSegment } from "../Entities/ABB6700Path";
+import type { ABB6700Pose } from "../UCs/SetPoseUC";
+import {
+  ABB6700PM,
+  ABB6700PathVM,
+  ABB6700VM,
+  makeABB6700PM,
+} from "./ABB6700PM";
 
 describe("ABB6700PM", () => {
   let appObjects: ReturnType<typeof makeAppObjectRepo>;
@@ -148,6 +155,106 @@ describe("ABB6700PM", () => {
       const vm = viewObserver.mock.calls[0][0] as ABB6700VM;
       expect(vm.snapCount).toBe(1);
     });
+
+    describe("path", () => {
+      function poseOf(degrees: number): ABB6700Pose {
+        return {
+          j1: Angle.FromDegrees(degrees),
+          j2: Angle.FromDegrees(degrees),
+          j3: Angle.FromDegrees(degrees),
+          j4: Angle.FromDegrees(degrees),
+          j5: Angle.FromDegrees(degrees),
+          j6: Angle.FromDegrees(degrees),
+        };
+      }
+
+      const segments: ABB6700PathSegment[] = [
+        { pose: poseOf(10), durationMs: 500, dwellMs: 200 },
+        { pose: poseOf(20), durationMs: 800 },
+      ];
+
+      function lastVM(): ABB6700VM {
+        const calls = viewObserver.mock.calls;
+        return calls[calls.length - 1][0] as ABB6700VM;
+      }
+
+      it("is undefined when the entity has no path", () => {
+        entity.requestSnap();
+
+        expect(lastVM()).toHaveProperty("path", undefined);
+      });
+
+      it("is built from the entity path and the current segment", () => {
+        entity.startPath(segments);
+
+        expect(viewObserver).toHaveBeenCalledOnce();
+        expect(lastVM().path).toEqual({
+          playCount: 1,
+          segmentIndex: 0,
+          phase: "moving",
+          durationMs: 500,
+          dwellMs: 200,
+          stopDurationMs: 0,
+        });
+      });
+
+      it("reads the segment fields at segmentIndex, with dwellMs 0 when absent", () => {
+        entity.path = {
+          playCount: 4,
+          segments,
+          segmentIndex: 1,
+          phase: "dwelling",
+          stopDurationMs: 0,
+        };
+
+        expect(lastVM().path).toEqual({
+          playCount: 4,
+          segmentIndex: 1,
+          phase: "dwelling",
+          durationMs: 800,
+          dwellMs: 0,
+          stopDurationMs: 0,
+        });
+      });
+
+      it("carries the stop duration while stopping", () => {
+        entity.path = {
+          playCount: 1,
+          segments,
+          segmentIndex: 0,
+          phase: "stopping",
+          stopDurationMs: 300,
+        };
+
+        expect(lastVM().path?.phase).toBe("stopping");
+        expect(lastVM().path?.stopDurationMs).toBe(300);
+      });
+
+      it("returns to undefined when the entity path is cleared", () => {
+        entity.startPath(segments);
+        viewObserver.mockClear();
+
+        entity.path = undefined;
+
+        expect(viewObserver).toHaveBeenCalledOnce();
+        expect(lastVM()).toHaveProperty("path", undefined);
+      });
+
+      it("does not emit again when the path is replaced by an equal-valued path", () => {
+        entity.startPath(segments);
+        viewObserver.mockClear();
+
+        entity.path = {
+          playCount: 1,
+          segments,
+          segmentIndex: 0,
+          phase: "moving",
+          stopDurationMs: 0,
+        };
+
+        expect(viewObserver).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe("VM Comparison Logic", () => {
@@ -171,6 +278,7 @@ describe("ABB6700PM", () => {
         stabilizerExtension: 0.01,
         transitionDurationMs: ABB_6700_DEFAULT_TRANSITION_DURATION_MS,
         snapCount: 0,
+        path: undefined,
       };
       const vm2: ABB6700VM = {
         j1: Angle.FromDegrees(10),
@@ -183,6 +291,7 @@ describe("ABB6700PM", () => {
         stabilizerExtension: 0.01,
         transitionDurationMs: ABB_6700_DEFAULT_TRANSITION_DURATION_MS,
         snapCount: 0,
+        path: undefined,
       };
 
       expect(pm.vmsAreEqual(vm1, vm2)).toBe(true);
@@ -200,6 +309,7 @@ describe("ABB6700PM", () => {
         stabilizerExtension: 0,
         transitionDurationMs: ABB_6700_DEFAULT_TRANSITION_DURATION_MS,
         snapCount: 0,
+        path: undefined,
       };
       const vm2: ABB6700VM = {
         j1: Angle.FromDegrees(20),
@@ -212,6 +322,7 @@ describe("ABB6700PM", () => {
         stabilizerExtension: 0,
         transitionDurationMs: ABB_6700_DEFAULT_TRANSITION_DURATION_MS,
         snapCount: 0,
+        path: undefined,
       };
 
       expect(pm.vmsAreEqual(vm1, vm2)).toBe(false);
@@ -229,6 +340,7 @@ describe("ABB6700PM", () => {
         stabilizerExtension: 0,
         transitionDurationMs: 1000,
         snapCount: 0,
+        path: undefined,
       };
       const vm2: ABB6700VM = {
         ...vm1,
@@ -250,6 +362,7 @@ describe("ABB6700PM", () => {
         stabilizerExtension: 0,
         transitionDurationMs: ABB_6700_DEFAULT_TRANSITION_DURATION_MS,
         snapCount: 0,
+        path: undefined,
       };
       const vm2: ABB6700VM = {
         ...vm1,
@@ -257,6 +370,63 @@ describe("ABB6700PM", () => {
       };
 
       expect(pm.vmsAreEqual(vm1, vm2)).toBe(false);
+    });
+
+    describe("path", () => {
+      const pathVM: ABB6700PathVM = {
+        playCount: 1,
+        segmentIndex: 0,
+        phase: "moving",
+        durationMs: 500,
+        dwellMs: 200,
+        stopDurationMs: 0,
+      };
+      const vmWithPath: ABB6700VM = {
+        j1: Angle.FromDegrees(0),
+        j2: Angle.FromDegrees(0),
+        j3: Angle.FromDegrees(0),
+        j4: Angle.FromDegrees(0),
+        j5: Angle.FromDegrees(0),
+        j6: Angle.FromDegrees(0),
+        stabilizerAngle: Angle.FromDegrees(0),
+        stabilizerExtension: 0,
+        transitionDurationMs: ABB_6700_DEFAULT_TRANSITION_DURATION_MS,
+        snapCount: 0,
+        path: pathVM,
+      };
+
+      it("considers VMs with no path as equal", () => {
+        const a: ABB6700VM = { ...vmWithPath, path: undefined };
+        const b: ABB6700VM = { ...vmWithPath, path: undefined };
+
+        expect(pm.vmsAreEqual(a, b)).toBe(true);
+      });
+
+      it("considers VMs with equal-valued path objects as equal", () => {
+        const b: ABB6700VM = { ...vmWithPath, path: { ...pathVM } };
+
+        expect(pm.vmsAreEqual(vmWithPath, b)).toBe(true);
+      });
+
+      it("considers a VM with a path and a VM without as not equal", () => {
+        const withoutPath: ABB6700VM = { ...vmWithPath, path: undefined };
+
+        expect(pm.vmsAreEqual(vmWithPath, withoutPath)).toBe(false);
+        expect(pm.vmsAreEqual(withoutPath, vmWithPath)).toBe(false);
+      });
+
+      it.each<[string, Partial<ABB6700PathVM>]>([
+        ["playCount", { playCount: 2 }],
+        ["segmentIndex", { segmentIndex: 1 }],
+        ["phase", { phase: "dwelling" }],
+        ["durationMs", { durationMs: 600 }],
+        ["dwellMs", { dwellMs: 300 }],
+        ["stopDurationMs", { stopDurationMs: 100 }],
+      ])("considers VMs with a different path %s as not equal", (_, change) => {
+        const b: ABB6700VM = { ...vmWithPath, path: { ...pathVM, ...change } };
+
+        expect(pm.vmsAreEqual(vmWithPath, b)).toBe(false);
+      });
     });
   });
 

@@ -5,6 +5,8 @@ import {
   makeABB6700Entity,
   ABB_6700_DEFAULT_TRANSITION_DURATION_MS,
 } from "./ABB6700Entity";
+import type { ABB6700PathProgress, ABB6700PathSegment } from "./ABB6700Path";
+import type { ABB6700Pose } from "../UCs/SetPoseUC";
 
 describe("ABB6700Entity", () => {
   let appObjects: ReturnType<typeof makeAppObjectRepo>;
@@ -316,6 +318,159 @@ describe("ABB6700Entity", () => {
       entity.requestSnap();
       entity.requestSnap();
       expect(observer).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("Path", () => {
+    let entity: ABB6700Entity;
+
+    function poseOf(degrees: number): ABB6700Pose {
+      return {
+        j1: Angle.FromDegrees(degrees),
+        j2: Angle.FromDegrees(degrees),
+        j3: Angle.FromDegrees(degrees),
+        j4: Angle.FromDegrees(degrees),
+        j5: Angle.FromDegrees(degrees),
+        j6: Angle.FromDegrees(degrees),
+      };
+    }
+
+    function makeSegments(): ABB6700PathSegment[] {
+      return [
+        { pose: poseOf(10), durationMs: 500, dwellMs: 200 },
+        { pose: poseOf(20), durationMs: 800 },
+      ];
+    }
+
+    function makeProgress(): ABB6700PathProgress {
+      return {
+        playCount: 0,
+        segments: makeSegments(),
+        segmentIndex: 0,
+        phase: "moving",
+        stopDurationMs: 0,
+      };
+    }
+
+    beforeEach(() => {
+      const appObject = appObjects.getOrCreate("test-arm");
+      entity = makeABB6700Entity(appObject);
+    });
+
+    it("defaults to undefined", () => {
+      expect(entity.path).toBeUndefined();
+    });
+
+    it("can set and get path", () => {
+      const progress = makeProgress();
+      entity.path = progress;
+      expect(entity.path).toBe(progress);
+    });
+
+    it("notifies observers when path is set to a new reference", () => {
+      const observer = vi.fn();
+      entity.addChangeObserver(observer);
+      entity.path = makeProgress();
+      expect(observer).toHaveBeenCalledTimes(1);
+    });
+
+    it("notifies observers when path is replaced by an equal-valued object", () => {
+      entity.path = makeProgress();
+      const observer = vi.fn();
+      entity.addChangeObserver(observer);
+      entity.path = makeProgress();
+      expect(observer).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not notify observers when setting the same reference", () => {
+      const progress = makeProgress();
+      entity.path = progress;
+      const observer = vi.fn();
+      entity.addChangeObserver(observer);
+      entity.path = progress;
+      expect(observer).not.toHaveBeenCalled();
+    });
+
+    it("notifies observers when path is cleared", () => {
+      entity.path = makeProgress();
+      const observer = vi.fn();
+      entity.addChangeObserver(observer);
+      entity.path = undefined;
+      expect(entity.path).toBeUndefined();
+      expect(observer).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not notify observers when clearing an already-undefined path", () => {
+      const observer = vi.fn();
+      entity.addChangeObserver(observer);
+      entity.path = undefined;
+      expect(observer).not.toHaveBeenCalled();
+    });
+
+    describe("startPath()", () => {
+      it("starts at the first segment, moving, with no stop duration", () => {
+        const segments = makeSegments();
+        entity.startPath(segments);
+
+        expect(entity.path).toEqual({
+          playCount: 1,
+          segments,
+          segmentIndex: 0,
+          phase: "moving",
+          stopDurationMs: 0,
+        });
+      });
+
+      it("notifies observers once", () => {
+        const observer = vi.fn();
+        entity.addChangeObserver(observer);
+        entity.startPath(makeSegments());
+        expect(observer).toHaveBeenCalledTimes(1);
+      });
+
+      it("does not write the joints", () => {
+        entity.startPath(makeSegments());
+
+        expect(entity.j1.degrees).toBe(0);
+        expect(entity.j2.degrees).toBe(0);
+        expect(entity.j3.degrees).toBe(0);
+        expect(entity.j4.degrees).toBe(0);
+        expect(entity.j5.degrees).toBe(0);
+        expect(entity.j6.degrees).toBe(0);
+      });
+
+      it("keeps a copy of the segment list", () => {
+        const segments = makeSegments();
+        entity.startPath(segments);
+        segments.pop();
+
+        expect(entity.path?.segments).toHaveLength(2);
+        expect(entity.path?.segments).not.toBe(segments);
+      });
+
+      it("increments the play count on every call and never resets it", () => {
+        const playCount = () => entity.path?.playCount;
+
+        entity.startPath(makeSegments());
+        expect(playCount()).toBe(1);
+
+        entity.startPath(makeSegments());
+        expect(playCount()).toBe(2);
+
+        entity.path = undefined;
+        entity.startPath(makeSegments());
+        expect(playCount()).toBe(3);
+      });
+
+      it("replaces a path already in progress", () => {
+        entity.startPath(makeSegments());
+        entity.path = { ...makeProgress(), segmentIndex: 1, phase: "dwelling" };
+
+        entity.startPath(makeSegments());
+
+        expect(entity.path?.segmentIndex).toBe(0);
+        expect(entity.path?.phase).toBe("moving");
+      });
     });
   });
 });

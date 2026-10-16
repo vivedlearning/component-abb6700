@@ -1,6 +1,27 @@
-import { describe, it } from "vitest";
+import { describe, it, beforeEach, expect } from "vitest";
+import { Angle, type AppObjectRepo } from "@vived/core";
+import { makeDomainForTesting } from "../../src/Domain/makeDomainForTesting";
+import { ABB6700Facade, ABB_6700_STATE_VERSION } from "../../src/ABB6700Facade";
+import { aBB6700PMAdapter } from "../../src/Domain/Adapters/aBB6700PMAdapter";
+import type { ABB6700VM } from "../../src/Domain/PMs/ABB6700PM";
 
 describe("PRD: path-playback", () => {
+  let appObjects: AppObjectRepo;
+  let facade: ABB6700Facade;
+
+  beforeEach(() => {
+    ({ appObjects } = makeDomainForTesting());
+    facade = new ABB6700Facade("arm-1", appObjects);
+  });
+
+  function readVM(): () => ABB6700VM | undefined {
+    let vm: ABB6700VM | undefined;
+    aBB6700PMAdapter.subscribe("arm-1", appObjects, (v) => {
+      vm = v;
+    });
+    return () => vm;
+  }
+
   // --- Story stubs ---
   // it.todo = not yet implemented · it() = done · it.skip = view-only
   // Story text must be verbatim from the PRD.
@@ -212,9 +233,61 @@ describe("PRD: path-playback", () => {
     it.skip("from-screen: the new path starts from the angles on screen");
   });
 
-  it.todo(
-    "story-16: As a host, I want pose commands, the snap option and the transition duration to behave as before when no path is in progress, so that existing hosts see no change.",
-  );
+  it("story-16: As a host, I want pose commands, the snap option and the transition duration to behave as before when no path is in progress, so that existing hosts see no change.", () => {
+    const vm = readVM();
+    const expectNoPath = () => expect(vm()).toHaveProperty("path", undefined);
+    expectNoPath();
+
+    const pose = {
+      j1: Angle.FromDegrees(11),
+      j2: Angle.FromDegrees(22),
+      j3: Angle.FromDegrees(33),
+      j4: Angle.FromDegrees(44),
+      j5: Angle.FromDegrees(55),
+      j6: Angle.FromDegrees(66),
+    };
+    facade.setPose(pose);
+    expect(vm()?.j1.degrees).toBe(11);
+    expect(vm()?.j6.degrees).toBe(66);
+    expect(vm()?.snapCount).toBe(0);
+    expectNoPath();
+
+    facade.setJointAngle("j3", Angle.FromDegrees(99));
+    expect(vm()?.j3.degrees).toBe(99);
+    expect(vm()?.j2.degrees).toBe(22);
+    expect(vm()?.snapCount).toBe(0);
+    expectNoPath();
+
+    const state = {
+      version: ABB_6700_STATE_VERSION,
+      j1: 1,
+      j2: 2,
+      j3: 3,
+      j4: 4,
+      j5: 5,
+      j6: 6,
+    };
+    facade.applyState(state);
+    expect(facade.getState()).toEqual(state);
+    expect(vm()?.snapCount).toBe(0);
+    expectNoPath();
+
+    facade.setTransitionDuration(250);
+    expect(vm()?.transitionDurationMs).toBe(250);
+    expect(vm()?.j1.degrees).toBe(1);
+    expectNoPath();
+
+    facade.setPose(pose, { transition: "none" });
+    expect(vm()?.snapCount).toBe(1);
+    expect(vm()?.j1.degrees).toBe(11);
+    expect(vm()?.transitionDurationMs).toBe(250);
+    expectNoPath();
+
+    facade.setJointAngle("j3", Angle.FromDegrees(99), { transition: "none" });
+    expect(vm()?.snapCount).toBe(2);
+    expect(vm()?.j3.degrees).toBe(99);
+    expectNoPath();
+  });
 
   describe("story-17: As a host, I want a path requested before the view loads to play once it loads, so that I can start a program in the same tick I create the arm.", () => {
     it.todo(
