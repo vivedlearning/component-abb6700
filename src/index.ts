@@ -18,6 +18,7 @@ export {
 export {
   ABB_6700_DEFAULT_STOP_DURATION_MS,
   type ABB6700PathPhase,
+  type ABB6700PathProgress,
   type ABB6700PathSegment,
   type ABB6700StopPathOptions,
 } from "./Domain/Entities/ABB6700Path";
@@ -60,6 +61,7 @@ export {
 export { setupABB6700InstanceFactory } from "./Domain/Factory/setupABB6700InstanceFactory";
 
 // Use Cases
+export { PlayPathUC, makePlayPathUC } from "./Domain/UCs/PlayPathUC";
 export {
   SetJointAngleUC,
   makeSetJointAngleUC,
@@ -84,9 +86,13 @@ export { setTransitionDuration } from "./Domain/Controllers/setTransitionDuratio
 export { getPose } from "./Domain/Controllers/getPose";
 export { applyABB6700State } from "./Domain/Controllers/applyABB6700State";
 export { getABB6700State } from "./Domain/Controllers/getABB6700State";
+export { playPath } from "./Domain/Controllers/playPath";
+export { onPathSegmentReached } from "./Domain/Controllers/onPathSegmentReached";
+export { onPathCompleted } from "./Domain/Controllers/onPathCompleted";
 
 // Mocks (for consumer testing)
 export { MockABB6700PM } from "./Domain/Mocks/MockABB6700PM";
+export { MockPlayPathUC } from "./Domain/Mocks/MockPlayPathUC";
 export { MockSetJointAngleUC } from "./Domain/Mocks/MockSetJointAngleUC";
 export { MockSetPoseUC } from "./Domain/Mocks/MockSetPoseUC";
 export { MockSetTransitionDurationUC } from "./Domain/Mocks/MockSetTransitionDurationUC";

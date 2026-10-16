@@ -3,10 +3,14 @@ import { aBB6700PMAdapter } from "./Domain/Adapters/aBB6700PMAdapter";
 import { applyABB6700State } from "./Domain/Controllers/applyABB6700State";
 import { createABB6700 } from "./Domain/Controllers/createABB6700";
 import { getABB6700State } from "./Domain/Controllers/getABB6700State";
+import { onPathCompleted } from "./Domain/Controllers/onPathCompleted";
+import { onPathSegmentReached } from "./Domain/Controllers/onPathSegmentReached";
+import { playPath } from "./Domain/Controllers/playPath";
 import { setJointAngle } from "./Domain/Controllers/setJointAngle";
 import { setPose } from "./Domain/Controllers/setPose";
 import { setTransitionDuration } from "./Domain/Controllers/setTransitionDuration";
 import { ABB6700Entity } from "./Domain/Entities/ABB6700Entity";
+import type { ABB6700PathSegment } from "./Domain/Entities/ABB6700Path";
 import type { ABB6700VM } from "./Domain/PMs/ABB6700PM";
 import type { ABB6700Joint } from "./Domain/UCs/SetJointAngleUC";
 import type {
@@ -79,6 +83,10 @@ export class ABB6700Facade implements SmartComponent {
     setTransitionDuration(this.id, ms, this.appObjects);
   }
 
+  playPath(segments: ABB6700PathSegment[]): void {
+    playPath(this.id, segments, this.appObjects);
+  }
+
   getState(): ABB6700State {
     return getABB6700State(this.id, this.appObjects, ABB_6700_STATE_VERSION);
   }
@@ -90,9 +98,14 @@ export class ABB6700Facade implements SmartComponent {
   onEvent(event: string, cb: (...args: never[]) => void): () => void;
   onEvent<K extends keyof ABB6700Events>(event: K, cb: ABB6700Events[K]): () => void;
   onEvent(event: string, cb: (...args: never[]) => void): () => void {
-    void event;
-    void cb;
-    return () => {};
+    switch (event) {
+      case "pathSegmentReached":
+        return onPathSegmentReached(this.id, this.appObjects, cb as () => void);
+      case "pathCompleted":
+        return onPathCompleted(this.id, this.appObjects, cb as () => void);
+      default:
+        return () => {};
+    }
   }
 
   onViewModel(cb: (vm: ABB6700VM) => void): () => void {

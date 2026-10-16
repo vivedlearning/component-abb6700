@@ -11,8 +11,14 @@ export type ABB6700State = {
   j6: number;
 };
 
-/** Event catalog for the facade. The ABB 6700 currently emits no events. */
-export type ABB6700Events = Record<never, never>;
+/**
+ * Event catalog for the facade. Every event is about a path and carries no
+ * payload: read the segment index from the view model's `path`.
+ */
+export type ABB6700Events = {
+  pathSegmentReached: () => void;
+  pathCompleted: () => void;
+};
 
 /** The default joint angle, in degrees, for a joint absent from a snapshot. */
 export const ABB_6700_DEFAULT_JOINT_DEGREES = 0;

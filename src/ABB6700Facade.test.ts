@@ -54,12 +54,23 @@ vi.mock("@vived/app", () => ({
 import { BabylonEntity } from "@vived/app";
 import { makeABB6700FeatureFactory } from "./Domain/Factory/ABB6700FeatureFactory";
 import { ABB6700Entity } from "./Domain/Entities/ABB6700Entity";
+import { reportPathSegmentReached } from "./Domain/Controllers/reportPathSegmentReached";
+import type { ABB6700VM } from "./Domain/PMs/ABB6700PM";
 import { ABB6700BabylonView } from "./Frameworks/Babylon/ABB6700BabylonView";
 import {
   ABB6700Facade,
   ABB_6700_STATE_VERSION,
   type ABB6700State,
 } from "./ABB6700Facade";
+
+const makePose = (degrees: number) => ({
+  j1: Angle.FromDegrees(degrees),
+  j2: Angle.FromDegrees(degrees),
+  j3: Angle.FromDegrees(degrees),
+  j4: Angle.FromDegrees(degrees),
+  j5: Angle.FromDegrees(degrees),
+  j6: Angle.FromDegrees(degrees),
+});
 
 describe("ABB6700Facade", () => {
   let appObjects: AppObjectRepo;
@@ -164,7 +175,45 @@ describe("ABB6700Facade", () => {
     expect(vms).toEqual([0, 25]);
   });
 
-  it("provides a contract-complete no-op event API", () => {
+  it("plays a path: commits the first segment and reports it on the view model", () => {
+    const facade = new ABB6700Facade("arm-1", appObjects);
+    let path: ABB6700VM["path"];
+    facade.onViewModel((vm) => {
+      path = vm.path;
+    });
+
+    facade.playPath([
+      { pose: makePose(10), durationMs: 500, dwellMs: 100 },
+      { pose: makePose(20), durationMs: 500 },
+    ]);
+
+    expect(facade.getState().j1).toBe(10);
+    expect(path).toMatchObject({ segmentIndex: 0, phase: "moving" });
+  });
+
+  it("routes pathSegmentReached and pathCompleted to the path subscriptions", () => {
+    const facade = new ABB6700Facade("arm-1", appObjects);
+    const reached = vi.fn();
+    const completed = vi.fn();
+    const stopReached = facade.onEvent("pathSegmentReached", reached);
+    const stopCompleted = facade.onEvent("pathCompleted", completed);
+
+    facade.playPath([{ pose: makePose(10), durationMs: 500 }]);
+    reportPathSegmentReached("arm-1", appObjects, 1, 0);
+
+    expect(reached).toHaveBeenCalledTimes(1);
+    expect(completed).toHaveBeenCalledTimes(1);
+
+    stopReached();
+    stopCompleted();
+    facade.playPath([{ pose: makePose(10), durationMs: 500 }]);
+    reportPathSegmentReached("arm-1", appObjects, 2, 0);
+
+    expect(reached).toHaveBeenCalledTimes(1);
+    expect(completed).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns a no-op unsubscribe for an event name it does not know", () => {
     const facade = new ABB6700Facade("arm-1", appObjects);
     const unsubscribe = facade.onEvent("ignored", () => {});
 
