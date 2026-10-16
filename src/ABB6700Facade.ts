@@ -88,7 +88,7 @@ export class ABB6700Facade implements SmartComponent {
     setTransitionDuration(this.id, ms, this.appObjects);
   }
 
-  playPath(segments: ABB6700PathSegment[]): void {
+  playPath(segments: readonly ABB6700PathSegment[]): void {
     playPath(this.id, segments, this.appObjects);
   }
 

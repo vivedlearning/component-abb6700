@@ -110,7 +110,7 @@ Every facade has these eight members with this exact shape:
 | ------------------ | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | `id`               | `readonly string`                                              | The instance identifier.                                                                       |
 | `interfaceVersion` | `readonly number`                                             | `1`.                                                                                            |
-| `onEvent`          | `(event: string, cb: (...args: never[]) => void) => () => void` | Subscribe to a named event; returns an unsubscribe fn. The ABB 6700 emits **no events** — this is a contract-complete no-op. |
+| `onEvent`          | `(event: string, cb: (...args: never[]) => void) => () => void` | Subscribe to a named event; returns an unsubscribe fn. The ABB 6700 emits three path events (see *Events*). An unknown name returns a valid no-op unsubscribe fn. |
 | `onViewModel`      | `(cb: (vm: ABB6700VM) => void) => () => void`                  | Subscribe to the reactive view model; returns an unsubscribe fn.                                |
 | `load`             | `(variant?: string) => Promise<void>`                         | Attaches the Babylon view. The only async member.                                              |
 | `destroy`          | `() => void`                                                  | Tears down the instance and releases resources.                                                |
@@ -129,8 +129,12 @@ Every facade has these eight members with this exact shape:
 | `setPose`       | `(pose: ABB6700Pose, options?: ABB6700TransitionOption) => void` | Set all six joints atomically. |
 | `setJointAngle` | `(joint: ABB6700Joint, angle: Angle, options?: ABB6700TransitionOption) => void` | Set a single joint. |
 | `setTransitionDuration` | `(ms: number) => void`                     | Set how long the rendered arm takes to ease to each new pose. Default 1000; `0` disables transitions. |
+| `playPath`      | `(segments: ABB6700PathSegment[]) => void`         | Play an ordered list of segments (a pose, `durationMs`, optional `dwellMs`) as one motion. **Beyond contract v1**; additive. |
+| `stopPath`      | `(options?: ABB6700StopPathOptions) => void`       | Stop the path in flight: the arm slows to rest and the rest pose is committed. `{ durationMs }` sets the stop duration (default 400). **Beyond contract v1**; additive. |
 
 Commands return `void`. Pose commands are never blocked. `setPose`, `setJointAngle` and `applyState` take an optional `{ transition: "none" | "transition" }` (see *Snap commands* below). `setTransitionDuration` rejects a negative or non-finite value with a warning and keeps the previous duration. To read state, use `getState()` or `onViewModel` — the facade has no separate pose accessor.
+
+`playPath` and `stopPath` go beyond contract v1. They are additive, so the facade still satisfies the contract. `playPath` rejects the whole request with a warning, and changes nothing, if the segment list is empty or any `durationMs` or `dwellMs` is negative or not finite. `stopPath` with no path in progress does nothing. Any pose command, or a new `playPath`, cancels a path in progress.
 
 ### Pose transitions
 
@@ -142,15 +146,29 @@ By default the rendered arm does not jump to a commanded pose; the Babylon view 
 - **Snap commands.** Pass `{ transition: "none" }` to `setPose`, `setJointAngle` or `applyState` (facade or controller) and the rendered arm lands on the commanded target at once, ending any transition in flight — even when the target has not changed. Leaving the option out, or passing `"transition"`, transitions as usual; any other value is treated as the default. Use it for direct manipulation such as a joint slider; a slide change should transition. The choice is per command, so there is no mode to switch back.
 - Interpolation exists only in the view. `getState()` and the last VM delivered for a command always report the commanded target, so persistence and host UI never capture a mid-transition pose. The duration is not part of `ABB6700State`.
 
+**Paths and the path stop.** A path is a list of segments: a pose, a travel time and an optional dwell. Each segment plays as a pose transition over its own travel time, so the transition duration does not apply to it. The segment's pose is committed to the VM and `getState()` as the segment starts, and the first segment starts from the angles on screen. The one case where motion writes a pose is a path stop (`stopPath`). The view slows the arm along its current segment from the speed it has on screen and brings it to rest within the stop duration (default 400 ms), never past the segment's pose. The pose it rests at is committed and the rest of the path is dropped. An arm in a dwell, or at the start of a segment, stops where it is. A path is not part of `ABB6700State`.
+
 > **Migrating from 1.x:** `facade.getPose()` was removed in 2.0.0. Use `getState()` for the authored configuration, `onViewModel()` for live values, or the standalone `getPose` controller (see API Reference below) to read a pose without a facade.
 
 ### Events
 
-The ABB 6700 emits no events. `onEvent` exists only to satisfy the contract and always returns a valid no-op unsubscribe function. Drive UI from `onViewModel` / `getState` instead.
+The ABB 6700 emits three events, all about a path. Each is payload-free: the callback receives no arguments. Read the segment index from the view model's `path`.
+
+| Event                | Fires when                                                                                                                              |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `pathSegmentReached` | The rendered arm arrives at a segment's pose. Once per segment, in order. `vm.path` names the segment, in its `"dwelling"` phase.        |
+| `pathCompleted`      | The last segment has been reached and its dwell has ended. `pathSegmentReached` fires first for the last segment. `vm.path` is `undefined` and the last pose stays committed. |
+| `pathStopped`        | A path stop has brought the arm to rest and the rest pose is committed. `vm.path` is `undefined`.                                        |
+
+Subscribe with `facade.onEvent(name, cb)`. A host with no facade uses the subscription controllers instead: `onPathSegmentReached(id, appObjects, cb)`, `onPathCompleted(id, appObjects, cb)` and `onPathStopped(id, appObjects, cb)`. Each returns an unsubscribe function that stops further calls. For an id with no arm behind it, a controller submits a warning and returns a no-op unsubscribe function. An unknown event name passed to `onEvent` still returns a valid no-op unsubscribe function.
+
+A path cancelled by a pose command, or replaced by a new `playPath`, fires no event. After a stop request, neither `pathSegmentReached` nor `pathCompleted` fires. The events fire only while the arm's view renders (see *Known limitations*). Drive other UI from `onViewModel` / `getState`.
 
 ### Reactive view model (`ABB6700VM`)
 
-`onViewModel(cb)` emits the current VM immediately, then on every change, and returns an unsubscribe function. Fields: `j1`–`j6` (`Angle`), `stabilizerAngle` (`Angle`), `stabilizerExtension` (`number`), `transitionDurationMs` (`number`), `snapCount` (`number`, incremented by each snap command; the view snaps when it changes). The VM carries the commanded joint angles, never the interpolated angles the view renders mid-transition, and is distinct from the saved `ABB6700State`. A single pose command can emit several VMs (joints are written one at a time and the stabilizer is derived after J2), so intermediate VMs may show a partial pose; the last VM delivered for the command carries the full target.
+`onViewModel(cb)` emits the current VM immediately, then on every change, and returns an unsubscribe function. Fields: `j1`–`j6` (`Angle`), `stabilizerAngle` (`Angle`), `stabilizerExtension` (`number`), `transitionDurationMs` (`number`), `snapCount` (`number`, incremented by each snap command; the view snaps when it changes), `path` (`ABB6700PathVM | undefined`, the path in progress). The VM carries the commanded joint angles, never the interpolated angles the view renders mid-transition, and is distinct from the saved `ABB6700State`. A single pose command can emit several VMs (joints are written one at a time and the stabilizer is derived after J2), so intermediate VMs may show a partial pose; the last VM delivered for the command carries the full target.
+
+`path` (`ABB6700PathVM`) has `playCount` (which `playPath` this is; it increases with each call), `segmentIndex`, `phase`, `durationMs` (the current segment's travel time), `dwellMs` (the current segment's dwell; `0` when it has none) and `stopDurationMs` (the stop's duration while the phase is `"stopping"`, else `0`). `phase` is `"moving"` from the time a segment starts until the arm reaches its pose, `"dwelling"` from then until the dwell ends, and `"stopping"` from a stop request until the arm is at rest. While stopping, the committed pose stays the current segment's. `path` is `undefined` when no path is in progress: before the first path, after `pathCompleted` or `pathStopped`, and after a pose command cancels a path. During a path, no VM carries angles between two segment poses.
 
 ### State snapshot (`ABB6700State`)
 
@@ -181,6 +199,11 @@ For Host integration, prefer `ABB6700Facade`. `createBabylonABB6700` remains the
 | `getPose`                   | `(id: string, appObjects: AppObjectRepo) → ABB6700Pose \| undefined`                | Read the current pose.                                                          |
 | `getABB6700State`           | `(id: string, appObjects: AppObjectRepo, version: number) → ABB6700State`           | Snapshot the authored configuration without a facade. An unknown id submits a warning and resolves to the default state rather than throwing. |
 | `applyABB6700State`         | `(id: string, appObjects: AppObjectRepo, state: ABB6700State, options?: ABB6700TransitionOption) → void` | Restore a saved snapshot without a facade. Best-effort forward-compatible (ADR-0005); an unknown id submits a warning and leaves the domain untouched. |
+| `playPath`                  | `(id: string, segments: readonly ABB6700PathSegment[], appObjects: AppObjectRepo) → void` | Play a path without a facade. Rejects an empty list, or a negative or non-finite travel time or dwell, whole with a warning; an unknown id submits a warning. |
+| `stopPath`                  | `(id: string, appObjects: AppObjectRepo, options?: ABB6700StopPathOptions) → void`  | Stop the path in flight. Does nothing with no path in progress; an unknown id submits a warning. |
+| `onPathSegmentReached`      | `(id: string, appObjects: AppObjectRepo, cb: () => void) → () => void`              | Subscribe to the arm reaching a segment's pose. Returns an unsubscribe fn; an unknown id submits a warning and returns a no-op. |
+| `onPathCompleted`           | `(id: string, appObjects: AppObjectRepo, cb: () => void) → () => void`              | Subscribe to a path completing (last segment reached, dwell ended). Returns an unsubscribe fn. |
+| `onPathStopped`             | `(id: string, appObjects: AppObjectRepo, cb: () => void) → () => void`              | Subscribe to a stopped arm coming to rest. Returns an unsubscribe fn.           |
 | `makeABB6700FeatureFactory` | `(appObjects: AppObjectRepo) → ABB6700FeatureFactory`                               | Register the feature factory during domain setup.                               |
 | `aBB6700PMAdapter`          | `PmAdapter<ABB6700VM>`                                                              | Subscribe/unsubscribe to view model changes for custom UI.                      |
 
@@ -247,7 +270,41 @@ interface ABB6700VM {
   transitionDurationMs: number;
   /** Incremented by each snap command; the view snaps when it changes (added in 2.2.0) */
   snapCount: number;
+  /** The path in progress, or undefined when none is. Required: VM literals must set it. */
+  path: ABB6700PathVM | undefined;
 }
+
+/** One step of a path: a pose, the travel time to it, an optional dwell at it */
+interface ABB6700PathSegment {
+  pose: ABB6700Pose;
+  durationMs: number;
+  dwellMs?: number;
+}
+
+type ABB6700PathPhase = "moving" | "dwelling" | "stopping";
+
+/** The path in progress, as carried by the VM */
+interface ABB6700PathVM {
+  playCount: number;
+  segmentIndex: number;
+  phase: ABB6700PathPhase;
+  /** The current segment's travel time */
+  durationMs: number;
+  /** The current segment's dwell; 0 when it has none */
+  dwellMs: number;
+  /** The stop's duration while phase is "stopping", else 0 */
+  stopDurationMs: number;
+}
+
+/** Options for stopPath. Default duration: ABB_6700_DEFAULT_STOP_DURATION_MS (400) */
+type ABB6700StopPathOptions = { durationMs?: number };
+
+/** Payload-free events for ABB6700Facade.onEvent */
+type ABB6700Events = {
+  pathSegmentReached: () => void;
+  pathCompleted: () => void;
+  pathStopped: () => void;
+};
 ```
 
 ---
@@ -344,6 +401,122 @@ facade.applyState(slideState, { transition: "none" });
 ```
 
 The option is per command: nothing needs resetting after the drag ends. The standalone `setPose`, `setJointAngle` and `applyABB6700State` controllers take the same trailing option.
+
+### Play a weld program as a path
+
+A host with no facade plays the program through the flat controllers. Fire the weld gun in the `pathSegmentReached` callback: the arm then holds still for the segment's 1000 ms dwell.
+
+```typescript
+import { Angle } from "@vived/core";
+import {
+  aBB6700PMAdapter,
+  onPathCompleted,
+  onPathSegmentReached,
+  playPath,
+  type ABB6700PathSegment,
+  type ABB6700Pose,
+  type ABB6700VM,
+} from "@vived/component-abb-6700";
+
+const pose = (j1: number, j2: number, j3: number): ABB6700Pose => ({
+  j1: Angle.FromDegrees(j1),
+  j2: Angle.FromDegrees(j2),
+  j3: Angle.FromDegrees(j3),
+  j4: Angle.FromDegrees(0),
+  j5: Angle.FromDegrees(0),
+  j6: Angle.FromDegrees(0),
+});
+
+// Segment 0 approaches, segments 1 and 2 are weld spots, segment 3 retracts
+const program: ABB6700PathSegment[] = [
+  { pose: pose(10, -30, 20), durationMs: 900 },
+  { pose: pose(30, -45, 25), durationMs: 1200, dwellMs: 1000 },
+  { pose: pose(33, -45, 25), durationMs: 400, dwellMs: 1000 },
+  { pose: pose(0, 0, 0), durationMs: 1500 },
+];
+const weldSegments = [1, 2];
+
+// The events carry no payload, so keep the latest view model and read the segment from it
+let latest: ABB6700VM | undefined;
+const keepLatest = (vm: ABB6700VM) => {
+  latest = vm;
+};
+aBB6700PMAdapter.subscribe("robot-1", appObjects, keepLatest);
+
+const offReached = onPathSegmentReached("robot-1", appObjects, () => {
+  // vm.path names the segment reached, in its "dwelling" phase
+  if (weldSegments.includes(latest?.path?.segmentIndex ?? -1)) {
+    fireWeldGun(1000); // the host's own tooling
+  }
+});
+
+const offCompleted = onPathCompleted("robot-1", appObjects, () => {
+  offReached();
+  offCompleted();
+  aBB6700PMAdapter.unsubscribe("robot-1", appObjects, keepLatest);
+  startNextStep(); // the host's own sequencer
+});
+
+playPath("robot-1", program, appObjects);
+```
+
+A host that plays one path at a time can skip the view model and count callbacks instead: the first call is segment 0, the second is segment 1, and so on.
+
+With the facade, the same program is a few lines:
+
+```typescript
+const robot = new ABB6700Facade("robot-1", appObjects);
+await robot.load(); // a path advances only while the view renders
+
+let latest: ABB6700VM | undefined;
+robot.onViewModel((vm) => {
+  latest = vm;
+});
+robot.onEvent("pathSegmentReached", () => {
+  if (weldSegments.includes(latest?.path?.segmentIndex ?? -1)) fireWeldGun(1000);
+});
+robot.onEvent("pathCompleted", startNextStep);
+robot.playPath(program);
+```
+
+`playPath` commits the first segment's pose at once, and each later segment's pose as that segment starts, so `getState()` follows the program. A path requested before `load()` waits on its first segment and plays once the view loads. A new `playPath`, or any pose command, cancels the program in progress with no event.
+
+### Stop a path in flight
+
+```typescript
+import {
+  ABB_6700_STATE_VERSION,
+  getABB6700State,
+  onPathStopped,
+  stopPath,
+} from "@vived/component-abb-6700";
+
+// Subscribe first, then ask for the stop
+const offStopped = onPathStopped("robot-1", appObjects, () => {
+  offStopped();
+  // The rest pose is committed before this fires
+  const rest = getABB6700State("robot-1", appObjects, ABB_6700_STATE_VERSION);
+  recordStoppedAt(rest); // the host's own handling; rest.j1 … rest.j6 are in degrees
+});
+
+stopPath("robot-1", appObjects, { durationMs: 250 }); // omit the options for the default 400 ms
+```
+
+With the facade:
+
+```typescript
+const offStopped = robot.onEvent("pathStopped", () => {
+  offStopped();
+  recordStoppedAt(robot.getState());
+});
+robot.stopPath({ durationMs: 250 });
+```
+
+From the stop request until the arm is at rest, `vm.path.phase` is `"stopping"` and the committed pose is still the current segment's. When `pathStopped` fires, the rest pose is committed and `vm.path` is `undefined`. With no path in progress, `stopPath` does nothing and `pathStopped` does not fire, so do not wait for it. A second `stopPath` while the arm is stopping changes nothing.
+
+A host that needs the default stop time, for example to time its own display to the stop, imports `ABB_6700_DEFAULT_STOP_DURATION_MS` (`400`) instead of hard-coding the number.
+
+`stopPath` always slows the arm mid-motion. "Finish the current segment, then stop" is the host's to do: the component does not queue segments, so the host plays its program as short paths and simply does not play the next one.
 
 ### Persist and restore authored state (facade)
 
@@ -482,7 +655,7 @@ const view = ABB6700BabylonView.get(appObject);
 
 ### Default state
 
-All joints initialize to `0` degrees. The stabilizer angle and extension are computed automatically from J2 and also start at `0`. The pose transition duration defaults to `1000` ms (`ABB_6700_DEFAULT_TRANSITION_DURATION_MS`).
+All joints initialize to `0` degrees. The stabilizer angle and extension are computed automatically from J2 and also start at `0`. The pose transition duration defaults to `1000` ms (`ABB_6700_DEFAULT_TRANSITION_DURATION_MS`). No path is in progress, and a path stop takes `400` ms unless the request says otherwise (`ABB_6700_DEFAULT_STOP_DURATION_MS`).
 
 ### Automatic behaviors
 
@@ -490,8 +663,13 @@ The stabilizer connecting J1 and J2 is computed automatically — developers do 
 
 The rendered arm eases to each newly commanded pose over the transition duration, unless the command asks for a snap (see *Pose transitions*). The stabilizer is recomputed every frame from the interpolated J2, so the linkage stays attached mid-motion.
 
+While a path plays, the Babylon view is the clock (ADR-0007). It renders each segment over its travel time, counts the dwell, and tells the domain when the arm arrives and when a dwell ends. The domain then commits the next segment's pose and fires the events. The stabilizer is recomputed every frame during a segment and during a path stop.
+
 ### Known limitations
 
+- A path advances only while the arm's view renders. Before `load()`, in a hidden tab, or while the scene's render loop is stopped, a path waits on its current segment. Its pose is committed, so the VM and `getState()` are correct, but `pathSegmentReached` and `pathCompleted` do not fire until the view renders. Before `load()` a path waits on its first segment. When the view attaches, the arm appears on that pose, the segment counts as reached, and the path plays on.
+- A path stop completes only when the view brings the arm to rest. With no rendering view, `vm.path.phase` stays `"stopping"` and `pathStopped` does not fire until the view loads and renders. A pose command ends the stop.
+- `playPath` checks travel times and dwells, not the angles in a segment's pose. As with `setPose`, any angle is accepted.
 - Joint angle limits are not currently enforced by the component. Any angle value is accepted.
 - The stabilizer computation is driven only by J2; other joints do not affect it.
 - The EOT node ID in the GLB must be `"eot"` (lowercase) for the view to detect it. If missing, `eotTransformNode` returns `undefined`.
@@ -517,7 +695,7 @@ The rendered arm eases to each newly commanded pose over the transition duration
 | Category    | Exports                                                |
 | ----------- | ------------------------------------------------------ |
 | Entry point | `ABB6700Facade`, `createBabylonABB6700`                |
-| Controllers | `createABB6700`, `setJointAngle`, `setPose`, `setTransitionDuration`, `getPose`, `getABB6700State`, `applyABB6700State` |
+| Controllers | `createABB6700`, `setJointAngle`, `setPose`, `setTransitionDuration`, `getPose`, `getABB6700State`, `applyABB6700State`, `playPath`, `stopPath`, `onPathSegmentReached`, `onPathCompleted`, `onPathStopped` |
 | Adapter     | `aBB6700PMAdapter`                                     |
 | Factory     | `makeABB6700FeatureFactory`                            |
 
@@ -526,8 +704,8 @@ The rendered arm eases to each newly commanded pose over the transition duration
 | Category | Exports                                                            |
 | -------- | ------------------------------------------------------------------ |
 | View     | `ABB6700BabylonView` (`.get()`), `ABB6700_WHOLE_ARM_HIGHLIGHT_GROUP`               |
-| Types    | `ABB6700Pose`, `ABB6700Joint`, `ABB6700TransitionOption`, `ABB6700VM`, `ABB6700State`, `ABB6700Events`, `ABB6700EntityFactory`, `SmartComponent` |
-| Constants | `ABB_6700_STATE_VERSION`, `ABB_6700_DEFAULT_TRANSITION_DURATION_MS` |
+| Types    | `ABB6700Pose`, `ABB6700Joint`, `ABB6700TransitionOption`, `ABB6700VM`, `ABB6700PathVM`, `ABB6700PathSegment`, `ABB6700PathPhase`, `ABB6700StopPathOptions`, `ABB6700State`, `ABB6700Events`, `ABB6700EntityFactory`, `SmartComponent` |
+| Constants | `ABB_6700_STATE_VERSION`, `ABB_6700_DEFAULT_TRANSITION_DURATION_MS`, `ABB_6700_DEFAULT_STOP_DURATION_MS` |
 
 #### Internal / Advanced (extensibility/testing only — not for normal use)
 
@@ -535,8 +713,8 @@ The rendered arm eases to each newly commanded pose over the transition duration
 | ------------ | ---------------------------------------------------------------------- |
 | View factory | `makeABB6700BabylonView`                                               |
 | Factory      | `ABB6700FeatureFactory`, `setupABB6700InstanceFactory`                 |
-| Entities     | `ABB6700Entity`, `makeABB6700Entity`, `ABB6700Repo`, `makeABB6700Repo` |
-| Use Cases    | `SetJointAngleUC`, `makeSetJointAngleUC`, `SetPoseUC`, `makeSetPoseUC`, `SetTransitionDurationUC`, `makeSetTransitionDurationUC` |
+| Entities     | `ABB6700Entity`, `makeABB6700Entity`, `ABB6700Repo`, `makeABB6700Repo`, `ABB6700PathProgress` (type) |
+| Use Cases    | `SetJointAngleUC`, `makeSetJointAngleUC`, `SetPoseUC`, `makeSetPoseUC`, `SetTransitionDurationUC`, `makeSetTransitionDurationUC`, `PlayPathUC`, `makePlayPathUC`, `StopPathUC`, `makeStopPathUC` |
 | PMs          | `ABB6700PM`, `makeABB6700PM`                                           |
-| Mocks        | `MockABB6700PM`, `MockSetJointAngleUC`, `MockSetPoseUC`, `MockSetTransitionDurationUC` |
+| Mocks        | `MockABB6700PM`, `MockSetJointAngleUC`, `MockSetPoseUC`, `MockSetTransitionDurationUC`, `MockPlayPathUC`, `MockStopPathUC` |
 | Config       | `componentConfig`                                                      |
