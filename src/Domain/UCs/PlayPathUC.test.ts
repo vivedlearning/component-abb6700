@@ -133,6 +133,15 @@ describe("PlayPathUC", () => {
         ["has a negative dwell", [{ pose, durationMs: 1, dwellMs: -1 }]],
         ["has a NaN dwell", [{ pose, durationMs: 1, dwellMs: NaN }]],
         ["has an infinite dwell", [{ pose, durationMs: 1, dwellMs: Infinity }]],
+        // Shapes TypeScript rules out but untyped data can carry.
+        ["has a null segment", [null as unknown as ABB6700PathSegment]],
+        [
+          "has a later segment with no pose",
+          [
+            makeSegment(10),
+            { durationMs: 1 } as unknown as ABB6700PathSegment,
+          ],
+        ],
       ];
 
       it.each(bad)("is rejected with a warning when it %s", (_name, list) => {

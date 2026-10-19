@@ -131,7 +131,15 @@ class PlayPathUCImp extends PlayPathUC {
       return "Rejected an empty path";
     }
 
-    for (const [i, { durationMs, dwellMs }] of segments.entries()) {
+    for (const [i, segment] of segments.entries()) {
+      // TypeScript rules these shapes out, but untyped data can carry them.
+      if (typeof segment !== "object" || segment === null) {
+        return `Rejected segment ${i}: not a segment`;
+      }
+      if (typeof segment.pose !== "object" || segment.pose === null) {
+        return `Rejected segment ${i}: it has no pose`;
+      }
+      const { durationMs, dwellMs } = segment;
       if (!Number.isFinite(durationMs) || durationMs < 0) {
         return `Rejected invalid travel time in segment ${i}: ${durationMs}`;
       }
