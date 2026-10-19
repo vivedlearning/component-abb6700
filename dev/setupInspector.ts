@@ -67,8 +67,8 @@ export function setupInspector(
   // dwell on each, retract, home.
   const spot = (dj1: number, dj2: number): ABB6700Pose => ({
     ...POSES.reachForward,
-    j1: deg(dj1),
-    j2: deg(-45 + dj2),
+    j1: deg(POSES.reachForward.j1.degrees + dj1),
+    j2: deg(POSES.reachForward.j2.degrees + dj2),
   });
   const weldPath: ABB6700PathSegment[] = [
     { pose: POSES.home, durationMs: 800 },
