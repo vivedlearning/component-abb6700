@@ -6,7 +6,7 @@ import {
   ABB_6700_DEFAULT_TRANSITION_DURATION_MS,
 } from "./ABB6700Entity";
 import type { ABB6700PathProgress, ABB6700PathSegment } from "./ABB6700Path";
-import type { ABB6700Pose } from "../UCs/SetPoseUC";
+import type { ABB6700Pose } from "./ABB6700Pose";
 
 describe("ABB6700Entity", () => {
   let appObjects: ReturnType<typeof makeAppObjectRepo>;
@@ -446,6 +446,21 @@ describe("ABB6700Entity", () => {
 
         expect(entity.path?.segments).toHaveLength(2);
         expect(entity.path?.segments).not.toBe(segments);
+      });
+
+      it("keeps a copy of each segment and its pose", () => {
+        const segments = makeSegments();
+        const firstDuration = segments[0].durationMs;
+        const firstJ1 = segments[0].pose.j1;
+        entity.startPath(segments);
+
+        segments[0].durationMs = NaN;
+        segments[0].dwellMs = 999;
+        segments[0].pose.j1 = Angle.FromDegrees(99);
+
+        expect(entity.path?.segments[0].durationMs).toBe(firstDuration);
+        expect(entity.path?.segments[0].dwellMs).not.toBe(999);
+        expect(entity.path?.segments[0].pose.j1).toBe(firstJ1);
       });
 
       it("increments the play count on every call and never resets it", () => {

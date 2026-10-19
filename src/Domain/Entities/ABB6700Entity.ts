@@ -217,7 +217,12 @@ class ABB6700EntityImp extends ABB6700Entity {
     this._playCount++;
     this.path = {
       playCount: this._playCount,
-      segments: [...segments],
+      // A copy down to each pose, so the caller's later edits never reach the
+      // path in progress (or skip its validation).
+      segments: segments.map((segment) => ({
+        ...segment,
+        pose: { ...segment.pose },
+      })),
       segmentIndex: 0,
       phase: "moving",
       stopDurationMs: 0,
