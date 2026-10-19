@@ -1,6 +1,6 @@
 # ADR 0007: Path playback runs on the view's clock, and a path stop commits the pose the view brings the arm to rest at
 
-**Status:** Proposed · 2026-10-16
+**Status:** Accepted · 2026-10-19
 
 In 2.1.0, pose transitions went into the Babylon view only. A command commits its target to the entity at once. The view then eases the rendered arm toward that target on its render loop. The domain has no notion of time, and the glossary forbids interpolating in the domain or PM.
 
