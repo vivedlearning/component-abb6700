@@ -16,8 +16,9 @@ All notable changes to `@vived/component-ABB6700` will be documented in this fil
   angles on screen. A segment with a travel time of zero snaps to its pose. A segment
   whose pose equals the one before it still takes its travel time. `playPath`
   rejects the whole request with a warning, and changes nothing, if the list is
-  empty or any travel time or dwell is negative or not finite. The angles in a pose
-  are not checked, as with `setPose`.
+  empty, a segment has no pose, or any travel time or dwell is negative or not
+  finite. The angles in a pose are not checked, as with `setPose`. Each segment
+  and its pose are copied, so editing the list after the call changes nothing.
 - **`path` on the view model.** `ABB6700VM.path` (`ABB6700PathVM`) reports the path
   in progress: `playCount`, `segmentIndex`, `phase` (`"moving"`, `"dwelling"` or
   `"stopping"`), the current segment's `durationMs` and `dwellMs`, and
@@ -28,7 +29,8 @@ All notable changes to `@vived/component-ABB6700` will be documented in this fil
   rest). Subscribe with `facade.onEvent(name, cb)`, or with the standalone
   `onPathSegmentReached`, `onPathCompleted` and `onPathStopped` controllers, which
   take `(id, appObjects, cb)`. Each returns a function that stops further calls.
-  The callbacks receive no arguments. Inside `pathSegmentReached`, `vm.path` names
+  The callbacks receive no arguments. A callback that throws is reported through
+  `submitError`; the other callbacks still run and the path carries on. Inside `pathSegmentReached`, `vm.path` names
   the segment reached, in its `"dwelling"` phase, so a host can fire its weld gun
   for the dwell. For the last segment, `pathSegmentReached` fires before
   `pathCompleted`.

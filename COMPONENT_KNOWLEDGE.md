@@ -134,7 +134,7 @@ Every facade has these eight members with this exact shape:
 
 Commands return `void`. Pose commands are never blocked. `setPose`, `setJointAngle` and `applyState` take an optional `{ transition: "none" | "transition" }` (see *Snap commands* below). `setTransitionDuration` rejects a negative or non-finite value with a warning and keeps the previous duration. To read state, use `getState()` or `onViewModel` — the facade has no separate pose accessor.
 
-`playPath` and `stopPath` go beyond contract v1. They are additive, so the facade still satisfies the contract. `playPath` rejects the whole request with a warning, and changes nothing, if the segment list is empty or any `durationMs` or `dwellMs` is negative or not finite. `stopPath` with no path in progress does nothing. Any pose command, or a new `playPath`, cancels a path in progress.
+`playPath` and `stopPath` go beyond contract v1. They are additive, so the facade still satisfies the contract. `playPath` rejects the whole request with a warning, and changes nothing, if the segment list is empty, a segment is not an object with a `pose`, or any `durationMs` or `dwellMs` is negative or not finite. `stopPath` with no path in progress does nothing. Any pose command, or a new `playPath`, cancels a path in progress.
 
 ### Pose transitions
 
@@ -162,7 +162,7 @@ The ABB 6700 emits three events, all about a path. Each is payload-free: the cal
 
 Subscribe with `facade.onEvent(name, cb)`. A host with no facade uses the subscription controllers instead: `onPathSegmentReached(id, appObjects, cb)`, `onPathCompleted(id, appObjects, cb)` and `onPathStopped(id, appObjects, cb)`. Each returns an unsubscribe function that stops further calls. For an id with no arm behind it, a controller submits a warning and returns a no-op unsubscribe function. An unknown event name passed to `onEvent` still returns a valid no-op unsubscribe function.
 
-A path cancelled by a pose command, or replaced by a new `playPath`, fires no event. After a stop request, neither `pathSegmentReached` nor `pathCompleted` fires. The events fire only while the arm's view renders (see *Known limitations*). Drive other UI from `onViewModel` / `getState`.
+A callback that throws is reported through `submitError`: the other callbacks still run and the path carries on. A path cancelled by a pose command, or replaced by a new `playPath`, fires no event. A pose command issued from inside an `onViewModel` callback while the component commits a segment wins over that commit. After a stop request, neither `pathSegmentReached` nor `pathCompleted` fires. The events fire only while the arm's view renders (see *Known limitations*). Drive other UI from `onViewModel` / `getState`.
 
 ### Reactive view model (`ABB6700VM`)
 
@@ -199,7 +199,7 @@ For Host integration, prefer `ABB6700Facade`. `createBabylonABB6700` remains the
 | `getPose`                   | `(id: string, appObjects: AppObjectRepo) → ABB6700Pose \| undefined`                | Read the current pose.                                                          |
 | `getABB6700State`           | `(id: string, appObjects: AppObjectRepo, version: number) → ABB6700State`           | Snapshot the authored configuration without a facade. An unknown id submits a warning and resolves to the default state rather than throwing. |
 | `applyABB6700State`         | `(id: string, appObjects: AppObjectRepo, state: ABB6700State, options?: ABB6700TransitionOption) → void` | Restore a saved snapshot without a facade. Best-effort forward-compatible (ADR-0005); an unknown id submits a warning and leaves the domain untouched. |
-| `playPath`                  | `(id: string, segments: readonly ABB6700PathSegment[], appObjects: AppObjectRepo) → void` | Play a path without a facade. Rejects an empty list, or a negative or non-finite travel time or dwell, whole with a warning; an unknown id submits a warning. |
+| `playPath`                  | `(id: string, segments: readonly ABB6700PathSegment[], appObjects: AppObjectRepo) → void` | Play a path without a facade. Rejects an empty list, a segment with no pose, or a negative or non-finite travel time or dwell, whole with a warning; an unknown id submits a warning. |
 | `stopPath`                  | `(id: string, appObjects: AppObjectRepo, options?: ABB6700StopPathOptions) → void`  | Stop the path in flight. Does nothing with no path in progress; an unknown id submits a warning. |
 | `onPathSegmentReached`      | `(id: string, appObjects: AppObjectRepo, cb: () => void) → () => void`              | Subscribe to the arm reaching a segment's pose. Returns an unsubscribe fn; an unknown id submits a warning and returns a no-op. |
 | `onPathCompleted`           | `(id: string, appObjects: AppObjectRepo, cb: () => void) → () => void`              | Subscribe to a path completing (last segment reached, dwell ended). Returns an unsubscribe fn. |
@@ -404,7 +404,7 @@ The option is per command: nothing needs resetting after the drag ends. The stan
 
 ### Play a weld program as a path
 
-A host with no facade plays the program through the flat controllers. Fire the weld gun in the `pathSegmentReached` callback: the arm then holds still for the segment's 1000 ms dwell.
+A host with no facade plays its weld program as a path, through the flat controllers. Fire the weld gun in the `pathSegmentReached` callback: the arm then holds still for the segment's 1000 ms dwell.
 
 ```typescript
 import { Angle } from "@vived/core";
@@ -428,7 +428,7 @@ const pose = (j1: number, j2: number, j3: number): ABB6700Pose => ({
 });
 
 // Segment 0 approaches, segments 1 and 2 are weld spots, segment 3 retracts
-const program: ABB6700PathSegment[] = [
+const segments: ABB6700PathSegment[] = [
   { pose: pose(10, -30, 20), durationMs: 900 },
   { pose: pose(30, -45, 25), durationMs: 1200, dwellMs: 1000 },
   { pose: pose(33, -45, 25), durationMs: 400, dwellMs: 1000 },
@@ -457,12 +457,12 @@ const offCompleted = onPathCompleted("robot-1", appObjects, () => {
   startNextStep(); // the host's own sequencer
 });
 
-playPath("robot-1", program, appObjects);
+playPath("robot-1", segments, appObjects);
 ```
 
 A host that plays one path at a time can skip the view model and count callbacks instead: the first call is segment 0, the second is segment 1, and so on.
 
-With the facade, the same program is a few lines:
+With the facade, the same path is a few lines:
 
 ```typescript
 const robot = new ABB6700Facade("robot-1", appObjects);
@@ -476,10 +476,10 @@ robot.onEvent("pathSegmentReached", () => {
   if (weldSegments.includes(latest?.path?.segmentIndex ?? -1)) fireWeldGun(1000);
 });
 robot.onEvent("pathCompleted", startNextStep);
-robot.playPath(program);
+robot.playPath(segments);
 ```
 
-`playPath` commits the first segment's pose at once, and each later segment's pose as that segment starts, so `getState()` follows the program. A path requested before `load()` waits on its first segment and plays once the view loads. A new `playPath`, or any pose command, cancels the program in progress with no event.
+`playPath` commits the first segment's pose at once, and each later segment's pose as that segment starts, so `getState()` follows the path. A path requested before `load()` waits on its first segment and plays once the view loads. A new `playPath`, or any pose command, cancels the path in progress with no event.
 
 ### Stop a path in flight
 
@@ -516,7 +516,7 @@ From the stop request until the arm is at rest, `vm.path.phase` is `"stopping"` 
 
 A host that needs the default stop time, for example to time its own display to the stop, imports `ABB_6700_DEFAULT_STOP_DURATION_MS` (`400`) instead of hard-coding the number.
 
-`stopPath` always slows the arm mid-motion. "Finish the current segment, then stop" is the host's to do: the component does not queue segments, so the host plays its program as short paths and simply does not play the next one.
+`stopPath` always slows the arm mid-motion. "Finish the current segment, then stop" is the host's to do: the component does not queue segments, so the host plays its weld program as short paths and simply does not play the next one.
 
 ### Persist and restore authored state (facade)
 
