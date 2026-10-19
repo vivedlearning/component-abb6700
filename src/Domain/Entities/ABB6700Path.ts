@@ -1,4 +1,4 @@
-import type { ABB6700Pose } from "../UCs/SetPoseUC";
+import type { ABB6700Pose } from "./ABB6700Pose";
 
 /** One step of a path: a pose, the travel time to it, an optional dwell at it. */
 export interface ABB6700PathSegment {

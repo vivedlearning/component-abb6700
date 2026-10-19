@@ -1,14 +1,9 @@
-import { Angle, AppObject, AppObjectRepo, AppObjectUC } from "@vived/core";
+import { AppObject, AppObjectRepo, AppObjectUC } from "@vived/core";
 import { ABB6700Entity } from "../Entities/ABB6700Entity";
+import type { ABB6700Pose } from "../Entities/ABB6700Pose";
 
-export interface ABB6700Pose {
-  j1: Angle;
-  j2: Angle;
-  j3: Angle;
-  j4: Angle;
-  j5: Angle;
-  j6: Angle;
-}
+// The pose type lives with the entities; re-exported so existing imports hold.
+export type { ABB6700Pose } from "../Entities/ABB6700Pose";
 
 /**
  * Per-command rendering option for setPose, setJointAngle and applyState.
