@@ -1,6 +1,7 @@
 import { AppObject, AppObjectRepo, AppObjectUC } from "@vived/core";
 import { ABB6700Entity } from "../Entities/ABB6700Entity";
 import type { ABB6700Pose } from "../Entities/ABB6700Pose";
+import { writePose } from "./writePose";
 
 // The pose type lives with the entities; re-exported so existing imports hold.
 export type { ABB6700Pose } from "../Entities/ABB6700Pose";
@@ -51,12 +52,7 @@ class SetPoseUCImp extends SetPoseUC {
     // A pose command cancels a path in progress, silently. Cancel first, so
     // no VM pairs the path with the commanded joints.
     entity.path = undefined;
-    entity.j1 = pose.j1;
-    entity.j2 = pose.j2;
-    entity.j3 = pose.j3;
-    entity.j4 = pose.j4;
-    entity.j5 = pose.j5;
-    entity.j6 = pose.j6;
+    writePose(entity, pose);
 
     if (options?.transition === "none") {
       entity.requestSnap();

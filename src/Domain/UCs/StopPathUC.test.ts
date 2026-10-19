@@ -268,6 +268,39 @@ describe("StopPathUC", () => {
       expect(joints()).toEqual(jointsOf(25));
       expect(cb).toHaveBeenCalledTimes(1);
     });
+
+    it("leaves a path an observer started during the rest pose's writes, and announces no stop", () => {
+      const cb = vi.fn();
+      uc.subscribeOnStopped(cb);
+      let tookOver = false;
+      let started: unknown;
+      entity.addChangeObserver(() => {
+        if (!tookOver && entity.j1.degrees === 25) {
+          tookOver = true;
+          entity.startPath([{ pose: makePose(70), durationMs: 400 }]);
+          started = entity.path; // a playPath from a VM subscriber
+        }
+      });
+
+      uc.restedAt(1, rest);
+
+      expect(entity.path).toBe(started);
+      expect(cb).not.toHaveBeenCalled();
+    });
+
+    it("reports a stopped callback that throws and still notifies the others", () => {
+      const errorSpy = vi.spyOn(appObjects, "submitError");
+      const other = vi.fn();
+      uc.subscribeOnStopped(() => {
+        throw new Error("host failed");
+      });
+      uc.subscribeOnStopped(other);
+
+      expect(() => uc.restedAt(1, rest)).not.toThrow();
+
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+      expect(other).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("subscriptions", () => {

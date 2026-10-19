@@ -92,15 +92,40 @@ describe("PlayPathUC", () => {
       expect(entity.path?.segments).not.toBe(segments);
     });
 
-    it("writes the joints before the path is recorded", () => {
+    it("records the path before it writes the first pose", () => {
       const jointsWhenPathAppeared: number[][] = [];
       entity.addChangeObserver(() => {
-        if (entity.path) jointsWhenPathAppeared.push(joints());
+        if (entity.path && jointsWhenPathAppeared.length === 0)
+          jointsWhenPathAppeared.push(joints());
       });
 
       uc.playPath(makeSegments());
 
-      expect(jointsWhenPathAppeared).toEqual([jointsOf(10)]);
+      expect(jointsWhenPathAppeared).toEqual([[0, 0, 0, 0, 0, 0]]);
+      expect(joints()).toEqual(jointsOf(10));
+    });
+
+    it("stops writing when an observer issues a command during the writes", () => {
+      uc.playPath(makeSegments());
+      let tookOver = false;
+      entity.addChangeObserver(() => {
+        if (tookOver || entity.j1.degrees !== 70) return;
+        // A pose command from a VM subscriber: cancel, then write its pose.
+        tookOver = true;
+        entity.path = undefined;
+        entity.j1 = Angle.FromDegrees(50);
+        entity.j2 = Angle.FromDegrees(50);
+        entity.j3 = Angle.FromDegrees(50);
+        entity.j4 = Angle.FromDegrees(50);
+        entity.j5 = Angle.FromDegrees(50);
+        entity.j6 = Angle.FromDegrees(50);
+      });
+
+      uc.playPath([makeSegment(70)]);
+
+      expect(tookOver).toBe(true);
+      expect(entity.path).toBeUndefined();
+      expect(joints()).toEqual([50, 50, 50, 50, 50, 50]);
     });
 
     it("increments the play count on each call", () => {
@@ -305,6 +330,22 @@ describe("PlayPathUC", () => {
         expect(joints()).toEqual(jointsOf(10));
         expect(completed).not.toHaveBeenCalled();
       });
+
+      it("reports a callback that throws, still notifies the others, and advances", () => {
+        uc.playPath([makeSegment(10), makeSegment(20)]);
+        const errorSpy = vi.spyOn(appObjects, "submitError");
+        const other = vi.fn();
+        uc.subscribeOnSegmentReached(() => {
+          throw new Error("weld gun missing");
+        });
+        uc.subscribeOnSegmentReached(other);
+
+        expect(() => uc.segmentReached(2, 0)).not.toThrow();
+
+        expect(errorSpy).toHaveBeenCalledTimes(1);
+        expect(other).toHaveBeenCalledTimes(1);
+        expect(entity.path).toMatchObject({ segmentIndex: 1, phase: "moving" });
+      });
     });
   });
 
@@ -326,6 +367,19 @@ describe("PlayPathUC", () => {
 
       expect(entity.path).toMatchObject({ segmentIndex: 1, phase: "moving" });
       expect(jointsWhenSegmentOneAppeared).toEqual([jointsOf(20)]);
+    });
+
+    it("does not resume a path an observer cancelled during the next pose's writes", () => {
+      entity.addChangeObserver(() => {
+        if (entity.path?.phase === "dwelling" && entity.j1.degrees === 20) {
+          entity.path = undefined; // a pose command from a VM subscriber
+        }
+      });
+
+      uc.dwellEnded(1, 0);
+
+      expect(entity.path).toBeUndefined();
+      expect(joints()[1]).toBe(11); // the writes stopped after j1
     });
 
     it("ignores a stale play count", () => {

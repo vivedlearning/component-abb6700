@@ -4,7 +4,9 @@ import {
   ABB_6700_DEFAULT_STOP_DURATION_MS,
   type ABB6700StopPathOptions,
 } from "../Entities/ABB6700Path";
-import type { ABB6700Pose } from "./SetPoseUC";
+import type { ABB6700Pose } from "../Entities/ABB6700Pose";
+import { CallbackSet } from "./CallbackSet";
+import { writePose } from "./writePose";
 
 /**
  * StopPathUC
@@ -38,7 +40,9 @@ export function makeStopPathUC(appObject: AppObject): StopPathUC {
 }
 
 class StopPathUCImp extends StopPathUC {
-  private stoppedCallbacks = new Set<() => void>();
+  private stoppedCallbacks = new CallbackSet("pathStopped", (m) =>
+    this.error(m),
+  );
 
   private get entity(): ABB6700Entity | undefined {
     return this.getCachedLocalComponent<ABB6700Entity>(ABB6700Entity.type);
@@ -69,23 +73,16 @@ class StopPathUCImp extends StopPathUC {
       return;
     }
 
-    entity.j1 = pose.j1;
-    entity.j2 = pose.j2;
-    entity.j3 = pose.j3;
-    entity.j4 = pose.j4;
-    entity.j5 = pose.j5;
-    entity.j6 = pose.j6;
+    // Commit the rest pose while the path is still stopping. An observer that
+    // issues a command during the writes takes the arm over: stop there, and
+    // announce no stop, as for a pose command during a stop.
+    if (!writePose(entity, pose, () => entity.path === path)) return;
     entity.path = undefined;
-
-    // Notifies a copy, so a callback may unsubscribe while being notified.
-    [...this.stoppedCallbacks].forEach((cb) => cb());
+    this.stoppedCallbacks.notify();
   }
 
   subscribeOnStopped(cb: () => void): () => void {
-    this.stoppedCallbacks.add(cb);
-    return () => {
-      this.stoppedCallbacks.delete(cb);
-    };
+    return this.stoppedCallbacks.subscribe(cb);
   }
 
   // The requested stop duration. An invalid one is replaced by the default.

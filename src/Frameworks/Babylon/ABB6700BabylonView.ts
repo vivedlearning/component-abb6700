@@ -498,8 +498,8 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
       return;
     }
 
-    // The domain writes a new path's joints before it sets the path, so a
-    // plain transition may have just started. No frame has passed: drop it.
+    // A path supersedes any plain transition in flight, and its motion starts
+    // from the angles on screen.
     this.transition = undefined;
 
     const key = { playCount, segmentIndex };

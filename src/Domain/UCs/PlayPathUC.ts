@@ -5,7 +5,8 @@ import type {
   ABB6700PathProgress,
   ABB6700PathSegment,
 } from "../Entities/ABB6700Path";
-import type { ABB6700Pose } from "./SetPoseUC";
+import { CallbackSet } from "./CallbackSet";
+import { writePose } from "./writePose";
 
 /**
  * PlayPathUC
@@ -41,8 +42,12 @@ export function makePlayPathUC(appObject: AppObject): PlayPathUC {
 }
 
 class PlayPathUCImp extends PlayPathUC {
-  private reachedCallbacks = new Set<() => void>();
-  private completedCallbacks = new Set<() => void>();
+  private reachedCallbacks = new CallbackSet("pathSegmentReached", (m) =>
+    this.error(m),
+  );
+  private completedCallbacks = new CallbackSet("pathCompleted", (m) =>
+    this.error(m),
+  );
 
   private get entity(): ABB6700Entity | undefined {
     return this.getCachedLocalComponent<ABB6700Entity>(ABB6700Entity.type);
@@ -61,10 +66,12 @@ class PlayPathUCImp extends PlayPathUC {
       return;
     }
 
-    // Joints first, so the VM that carries the new phase already carries the
-    // whole segment pose.
-    this.writePose(entity, segments[0].pose);
+    // Record the path, then write its first pose. An observer that issues a
+    // command during the writes replaces or clears the path, and the writes
+    // stop there: the later command wins.
     entity.startPath(segments);
+    const started = entity.path;
+    writePose(entity, segments[0].pose, () => entity.path === started);
   }
 
   segmentReached(playCount: number, segmentIndex: number): void {
@@ -74,7 +81,7 @@ class PlayPathUCImp extends PlayPathUC {
 
     const dwelling = { ...path, phase: "dwelling" as const };
     entity.path = dwelling;
-    this.notify(this.reachedCallbacks);
+    this.reachedCallbacks.notify();
 
     // A callback may have replaced, cancelled or stopped the path.
     if (entity.path === dwelling && !path.segments[segmentIndex].dwellMs) {
@@ -91,17 +98,11 @@ class PlayPathUCImp extends PlayPathUC {
   }
 
   subscribeOnSegmentReached(cb: () => void): () => void {
-    this.reachedCallbacks.add(cb);
-    return () => {
-      this.reachedCallbacks.delete(cb);
-    };
+    return this.reachedCallbacks.subscribe(cb);
   }
 
   subscribeOnCompleted(cb: () => void): () => void {
-    this.completedCallbacks.add(cb);
-    return () => {
-      this.completedCallbacks.delete(cb);
-    };
+    return this.completedCallbacks.subscribe(cb);
   }
 
   // The path in progress, if it is the report's path, segment and phase.
@@ -154,27 +155,17 @@ class PlayPathUCImp extends PlayPathUC {
   private advance(entity: ABB6700Entity, path: ABB6700PathProgress): void {
     if (path.segmentIndex === path.segments.length - 1) {
       entity.path = undefined;
-      this.notify(this.completedCallbacks);
+      this.completedCallbacks.notify();
       return;
     }
 
+    // Write the next pose while the path still dwells, then start the segment.
+    // An observer that issues a command during the writes takes the arm over:
+    // stop there and leave its path, or its lack of one, in place.
     const next = path.segmentIndex + 1;
-    this.writePose(entity, path.segments[next].pose);
+    if (!writePose(entity, path.segments[next].pose, () => entity.path === path))
+      return;
     entity.path = { ...path, segmentIndex: next, phase: "moving" };
-  }
-
-  // Notifies a copy, so a callback may unsubscribe while being notified.
-  private notify(callbacks: Set<() => void>): void {
-    [...callbacks].forEach((cb) => cb());
-  }
-
-  private writePose(entity: ABB6700Entity, pose: ABB6700Pose): void {
-    entity.j1 = pose.j1;
-    entity.j2 = pose.j2;
-    entity.j3 = pose.j3;
-    entity.j4 = pose.j4;
-    entity.j5 = pose.j5;
-    entity.j6 = pose.j6;
   }
 
   constructor(appObject: AppObject) {
