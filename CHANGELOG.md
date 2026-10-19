@@ -2,7 +2,7 @@
 
 All notable changes to `@vived/component-ABB6700` will be documented in this file.
 
-## [Unreleased]
+## [2.3.0] — 2026-10-19
 
 ### Added
 
@@ -30,10 +30,10 @@ All notable changes to `@vived/component-ABB6700` will be documented in this fil
   `onPathSegmentReached`, `onPathCompleted` and `onPathStopped` controllers, which
   take `(id, appObjects, cb)`. Each returns a function that stops further calls.
   The callbacks receive no arguments. A callback that throws is reported through
-  `submitError`; the other callbacks still run and the path carries on. Inside `pathSegmentReached`, `vm.path` names
-  the segment reached, in its `"dwelling"` phase, so a host can fire its weld gun
-  for the dwell. For the last segment, `pathSegmentReached` fires before
-  `pathCompleted`.
+  `submitError`; the other callbacks still run and the path carries on. Inside
+  `pathSegmentReached`, `vm.path` names the segment reached, in its `"dwelling"`
+  phase, so a host can fire its weld gun for the dwell. For the last segment,
+  `pathSegmentReached` fires before `pathCompleted`.
 - **Path stop.** `stopPath(options?)` on the facade, and the standalone
   `stopPath(id, appObjects, options?)` controller, stop a path in flight. The
   rendered arm slows along its current segment from the speed it has on screen. It

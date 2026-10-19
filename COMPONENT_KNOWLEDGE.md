@@ -2,10 +2,10 @@
 
 ## Summary
 
-The ABB 6700 is a 6-axis industrial robot arm smart component. It provides a fully rigged 3D model with 6 degrees of freedom (joints J1–J6) and an automatically-computed stabilizer linkage. Developers can set individual joint angles or full poses through simple controller functions; the rendered arm eases to each new pose over a configurable transition duration, or snaps straight there when a command asks for it. Use this component when your slide app needs an articulated robot arm for industrial simulation, robotics education, or manufacturing visualization.
+The ABB 6700 is a 6-axis industrial robot arm smart component. It provides a fully rigged 3D model with 6 degrees of freedom (joints J1–J6) and an automatically-computed stabilizer linkage. Developers can set individual joint angles or full poses through simple controller functions; the rendered arm eases to each new pose over a configurable transition duration, or snaps straight there when a command asks for it. A host can also play a path, an ordered list of poses with host-given travel times and dwells (for example a weld program), get an event as the arm reaches each pose, and stop the path in flight so the arm slows to rest where it is. Use this component when your slide app needs an articulated robot arm for industrial simulation, robotics education, or manufacturing visualization.
 
 - **Package**: `@vived/component-abb-6700`
-- **Version**: 2.2.0
+- **Version**: 2.3.0
 - **Interface version**: 1 (`SmartComponent` contract implemented by `ABB6700Facade`)
 - **GitHub**: `vivedlearning/component-abb6700`
 
@@ -14,7 +14,7 @@ The ABB 6700 is a 6-axis industrial robot arm smart component. It provides a ful
 ## Discovery
 
 - **Category**: Robotics / Industrial Equipment
-- **Tags**: robot arm, 6-DOF, articulated robot, industrial robot, ABB, manufacturing, joints, pose, kinematics
+- **Tags**: robot arm, 6-DOF, articulated robot, industrial robot, ABB, manufacturing, joints, pose, kinematics, path playback, weld path, spot welding, dwell, stop in flight
 - **Visual description**: An orange and grey 6-axis industrial robot arm (ABB IRB 6700 series). Approximately 1.5m reach. Mounted on a fixed base, with a visible stabilizer linkage between the base and the second joint. The end-of-arm has a tool mounting point (EOT) for attaching grippers, welders, or other tooling.
 - **Multi-instance**: Yes — multiple robots can coexist in a single scene.
 
@@ -270,11 +270,11 @@ interface ABB6700VM {
   transitionDurationMs: number;
   /** Incremented by each snap command; the view snaps when it changes (added in 2.2.0) */
   snapCount: number;
-  /** The path in progress, or undefined when none is. Required: VM literals must set it. */
+  /** The path in progress, or undefined when none is. Required: VM literals must set it (added in 2.3.0) */
   path: ABB6700PathVM | undefined;
 }
 
-/** One step of a path: a pose, the travel time to it, an optional dwell at it */
+/** One step of a path: a pose, the travel time to it, an optional dwell at it (added in 2.3.0) */
 interface ABB6700PathSegment {
   pose: ABB6700Pose;
   durationMs: number;
@@ -283,7 +283,7 @@ interface ABB6700PathSegment {
 
 type ABB6700PathPhase = "moving" | "dwelling" | "stopping";
 
-/** The path in progress, as carried by the VM */
+/** The path in progress, as carried by the VM (added in 2.3.0) */
 interface ABB6700PathVM {
   playCount: number;
   segmentIndex: number;
@@ -296,10 +296,10 @@ interface ABB6700PathVM {
   stopDurationMs: number;
 }
 
-/** Options for stopPath. Default duration: ABB_6700_DEFAULT_STOP_DURATION_MS (400) */
+/** Options for stopPath. Default duration: ABB_6700_DEFAULT_STOP_DURATION_MS (400) (added in 2.3.0) */
 type ABB6700StopPathOptions = { durationMs?: number };
 
-/** Payload-free events for ABB6700Facade.onEvent */
+/** Payload-free events for ABB6700Facade.onEvent (empty before 2.3.0) */
 type ABB6700Events = {
   pathSegmentReached: () => void;
   pathCompleted: () => void;
@@ -649,6 +649,26 @@ const view = appObject.getComponent("ABB6700BabylonView");
 const view = ABB6700BabylonView.get(appObject);
 ```
 
+### ❌ Reading the segment from the event callback's arguments
+
+```typescript
+// ❌ WRONG — the path events are payload-free; the callback receives no arguments
+robot.onEvent("pathSegmentReached", (segmentIndex: number) => {
+  fireWeldGun(segmentIndex); // segmentIndex is undefined
+});
+```
+
+```typescript
+// ✅ CORRECT — read where the path is from the latest view model
+let latest: ABB6700VM | undefined;
+robot.onViewModel((vm) => {
+  latest = vm;
+});
+robot.onEvent("pathSegmentReached", () => {
+  fireWeldGun(latest?.path?.segmentIndex);
+});
+```
+
 ---
 
 ## Constraints & Defaults
@@ -683,7 +703,7 @@ While a path plays, the Babylon view is the clock (ADR-0007). It renders each se
 | -------------- | --------------------------------- |
 | Package              | `@vived/component-abb-6700`       |
 | GitHub               | `vivedlearning/component-abb6700` |
-| Version              | 2.2.0                             |
+| Version              | 2.3.0                             |
 | Interface version    | 1                                 |
 | State schema version | 1 (`ABB6700State.version`)        |
 | Multi-instance       | Yes                               |
