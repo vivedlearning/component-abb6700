@@ -681,6 +681,27 @@ describe("ABB6700BabylonView path playback", () => {
       expect(rig.vm()?.path).toBeUndefined();
     });
 
+    it("reload: a path requested while the asset loads waits for the nodes, then plays", async () => {
+      const first = makeMockScene();
+      const rig = await mountPathArm(first);
+      const second = makeMockScene();
+      vi.mocked(BabylonEntity.get).mockReturnValue({
+        scene: second.scene,
+      } as never);
+      const loading = rig.view.load(); // the asset load is still pending
+
+      rig.facade.playPath([seg(POSE_B, 400), seg(POSE_C, 400)]);
+      for (let k = 0; k < 6; k++) second.frame(300);
+      expect(rig.events).toEqual([]);
+
+      await loading;
+      rig.joints = [1, 2, 3, 4, 5, 6].map((n) => makeMesh(`joint_${n}`));
+      callBindMeshes(rig.view, rig.joints);
+      expectAt(rig.joints, POSE_B);
+      second.frame(16);
+      expect(rig.events).toEqual(["reached:0"]);
+    });
+
     it("destroy: destroy() mid-path never throws and no event fires afterwards", async () => {
       const mock = makeMockScene();
       const rig = await mountPathArm(mock);

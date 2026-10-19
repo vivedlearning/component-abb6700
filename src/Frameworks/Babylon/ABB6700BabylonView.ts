@@ -151,6 +151,12 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
    * path to start with. Set only while a report is in progress.
    */
   private carry: { playCount: number; ms: number } | undefined;
+  /**
+   * False from the start of a load until bindMeshes binds the new nodes. The
+   * render loop moves nothing and reports nothing meanwhile, so a path never
+   * advances while the arm is not on screen (ADR-0007).
+   */
+  private bound = false;
   /** The last vm.snapCount seen, or undefined before the first VM. */
   private lastSnapCount: number | undefined;
   private scene: Scene | undefined;
@@ -214,6 +220,7 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
     this.transition = undefined;
     this.pathPlay = undefined;
     this.rendered = undefined;
+    this.bound = false;
 
     // Dispose previous instance if load is called again
     this.instantiatedEntries?.dispose();
@@ -346,6 +353,7 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
     this.rendered = undefined;
     this.transition = undefined;
     this.pathPlay = undefined;
+    this.bound = true;
 
     // Apply current state to the newly bound meshes
     if (this.lastVM) {
@@ -668,6 +676,7 @@ class ABB6700BabylonViewImp extends ABB6700BabylonView {
 
   /** Per-frame render-loop step: advances the path or transition in flight. */
   private onBeforeRender = (): void => {
+    if (!this.bound) return;
     if (this.pathPlay) {
       this.stepPath(this.pathPlay);
       return;
