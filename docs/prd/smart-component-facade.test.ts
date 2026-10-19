@@ -217,7 +217,7 @@ describe("PRD: smart-component-facade", () => {
     });
   });
 
-  it("story-11: As a slide Activity, I want `facade.onEvent(...)` to return a valid unsubscribe function even though the ABB 6700 emits no events, so that the facade satisfies the SmartComponent contract uniformly.", () => {
+  it("story-11: As a slide Activity, I want `facade.onEvent(...)` to return a valid unsubscribe function for any event name, including one the ABB 6700 does not emit, so that the facade satisfies the SmartComponent contract uniformly.", () => {
     const unsubscribe = facade.onEvent("ignored", () => {});
 
     expect(unsubscribe).toEqual(expect.any(Function));

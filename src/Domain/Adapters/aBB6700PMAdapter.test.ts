@@ -22,6 +22,10 @@ describe("aBB6700PMAdapter", () => {
     expect(aBB6700PMAdapter.defaultVM.j6.degrees).toBe(0);
   });
 
+  it("exposes a default VM with no path in progress", () => {
+    expect(aBB6700PMAdapter.defaultVM).toHaveProperty("path", undefined);
+  });
+
   it("subscribes view (addView called)", () => {
     const mockPM = new MockABB6700PM(appObject);
 

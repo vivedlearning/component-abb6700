@@ -1,14 +1,10 @@
-import { Angle, AppObject, AppObjectRepo, AppObjectUC } from "@vived/core";
+import { AppObject, AppObjectRepo, AppObjectUC } from "@vived/core";
 import { ABB6700Entity } from "../Entities/ABB6700Entity";
+import type { ABB6700Pose } from "../Entities/ABB6700Pose";
+import { writePose } from "./writePose";
 
-export interface ABB6700Pose {
-  j1: Angle;
-  j2: Angle;
-  j3: Angle;
-  j4: Angle;
-  j5: Angle;
-  j6: Angle;
-}
+// The pose type lives with the entities; re-exported so existing imports hold.
+export type { ABB6700Pose } from "../Entities/ABB6700Pose";
 
 /**
  * Per-command rendering option for setPose, setJointAngle and applyState.
@@ -53,12 +49,10 @@ class SetPoseUCImp extends SetPoseUC {
       this.warn("Missing ABB6700Entity");
       return;
     }
-    entity.j1 = pose.j1;
-    entity.j2 = pose.j2;
-    entity.j3 = pose.j3;
-    entity.j4 = pose.j4;
-    entity.j5 = pose.j5;
-    entity.j6 = pose.j6;
+    // A pose command cancels a path in progress, silently. Cancel first, so
+    // no VM pairs the path with the commanded joints.
+    entity.path = undefined;
+    writePose(entity, pose);
 
     if (options?.transition === "none") {
       entity.requestSnap();

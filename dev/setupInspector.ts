@@ -3,7 +3,14 @@ import { Angle, AppObjectRepo } from "@vived/core";
 import {
   ABB6700Entity,
   SetJointAngleUC,
+  aBB6700PMAdapter,
+  onPathCompleted,
+  onPathSegmentReached,
+  onPathStopped,
+  playPath,
+  stopPath,
   type ABB6700Joint,
+  type ABB6700PathSegment,
   type ABB6700Pose,
 } from "../src";
 import { setJointAngle } from "../src/Domain/Controllers/setJointAngle";
@@ -55,6 +62,38 @@ export function setupInspector(
       j6: deg(0),
     },
   };
+
+  // A spot weld demo: home, approach, three spots a few degrees apart with a
+  // dwell on each, retract, home.
+  const spot = (dj1: number, dj2: number): ABB6700Pose => ({
+    ...POSES.reachForward,
+    j1: deg(POSES.reachForward.j1.degrees + dj1),
+    j2: deg(POSES.reachForward.j2.degrees + dj2),
+  });
+  const weldPath: ABB6700PathSegment[] = [
+    { pose: POSES.home, durationMs: 800 },
+    { pose: POSES.reachForward, durationMs: 1500 },
+    { pose: spot(-3, 0), durationMs: 600, dwellMs: 1000 },
+    { pose: spot(0, 2), durationMs: 400, dwellMs: 1000 },
+    { pose: spot(3, 0), durationMs: 400, dwellMs: 1000 },
+    { pose: POSES.reachUp, durationMs: 1200 },
+    { pose: POSES.home, durationMs: 1500 },
+  ];
+
+  // The path events carry no payload: read where the path is from the VM.
+  let segmentIndex: number | undefined;
+  aBB6700PMAdapter.subscribe(instanceId, appObjects, (vm) => {
+    segmentIndex = vm.path?.segmentIndex;
+  });
+  onPathSegmentReached(instanceId, appObjects, () =>
+    console.log("path segment reached", { segmentIndex }),
+  );
+  onPathCompleted(instanceId, appObjects, () =>
+    console.log("path completed", { segmentIndex }),
+  );
+  onPathStopped(instanceId, appObjects, () =>
+    console.log("path stopped", { segmentIndex }),
+  );
 
   const joints = ["j1", "j2", "j3", "j4", "j5", "j6"] as const;
 
@@ -159,6 +198,18 @@ export function setupInspector(
       propertyName: "abb6700_pose_low_pick",
       type: InspectableType.Button,
       callback: () => setPose(instanceId, POSES.lowPick, appObjects),
+    },
+    {
+      label: "Play weld path",
+      propertyName: "abb6700_path_play_weld",
+      type: InspectableType.Button,
+      callback: () => playPath(instanceId, weldPath, appObjects),
+    },
+    {
+      label: "Stop path (0.4 s)",
+      propertyName: "abb6700_path_stop",
+      type: InspectableType.Button,
+      callback: () => stopPath(instanceId, appObjects, { durationMs: 400 }),
     },
   ];
 }

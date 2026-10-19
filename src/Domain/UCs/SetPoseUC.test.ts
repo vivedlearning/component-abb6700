@@ -62,6 +62,42 @@ describe("SetPoseUC", () => {
     expect(SetPoseUC.getById("missing", appObjects)).toBeUndefined();
   });
 
+  describe("path cancellation", () => {
+    const startPath = () =>
+      entity.startPath([{ pose: makePose(20), durationMs: 500 }]);
+
+    it("cancels the path in progress", () => {
+      startPath();
+
+      uc.setPose(makePose(10));
+
+      expect(entity.path).toBeUndefined();
+    });
+
+    it("cancels the path before writing the joints", () => {
+      startPath();
+      const before = entity.j1.degrees;
+      const seen: { path: unknown; j1: number }[] = [];
+      entity.addChangeObserver(() => {
+        seen.push({ path: entity.path, j1: entity.j1.degrees });
+      });
+
+      uc.setPose(makePose(10));
+
+      // The first notification carries the cancel, with the old joints.
+      expect(seen[0]).toEqual({ path: undefined, j1: before });
+    });
+
+    it("cancels the path when snapping", () => {
+      startPath();
+
+      uc.setPose(makePose(10), { transition: "none" });
+
+      expect(entity.path).toBeUndefined();
+      expect(entity.snapCount).toBe(1);
+    });
+  });
+
   describe("snap option", () => {
     it("does not increment snapCount when no options are given", () => {
       uc.setPose(makePose(10));

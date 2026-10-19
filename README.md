@@ -53,6 +53,40 @@ const snapshot = robot.getState();
 robot.applyState(snapshot);
 ```
 
+To play several poses as one motion, hand the arm a path: segments of a pose, a
+travel time in milliseconds, and an optional dwell. The component announces each
+arrival with a payload-free `pathSegmentReached` event. Read the segment from the
+view model's `path`. A path advances only while the arm's view renders, so call
+`load()` first.
+
+```ts
+const pose = (j1: number, j2: number, j3: number) => ({
+  j1: Angle.FromDegrees(j1),
+  j2: Angle.FromDegrees(j2),
+  j3: Angle.FromDegrees(j3),
+  j4: Angle.FromDegrees(0),
+  j5: Angle.FromDegrees(0),
+  j6: Angle.FromDegrees(0),
+});
+
+let segmentIndex: number | undefined;
+robot.onViewModel((vm) => {
+  segmentIndex = vm.path?.segmentIndex;
+});
+robot.onEvent("pathSegmentReached", () => {
+  console.log(`Reached segment ${segmentIndex}`); // e.g. fire the weld gun
+});
+
+robot.playPath([
+  { pose: pose(0, -20, 10), durationMs: 800 },
+  { pose: pose(30, -45, 25), durationMs: 1200, dwellMs: 1000 },
+]);
+
+// Stop it in flight: the arm slows to rest within 400 ms (or { durationMs }),
+// and the pose it rests at is committed.
+robot.stopPath();
+```
+
 If you need a fully-wired `AppObject` plus Babylon view in one call without the
 facade, use `createBabylonABB6700`:
 

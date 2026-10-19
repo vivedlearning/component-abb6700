@@ -15,11 +15,19 @@ export {
   makeABB6700Repo,
   type ABB6700EntityFactory,
 } from "./Domain/Entities/ABB6700Repo";
+export {
+  ABB_6700_DEFAULT_STOP_DURATION_MS,
+  type ABB6700PathPhase,
+  type ABB6700PathProgress,
+  type ABB6700PathSegment,
+  type ABB6700StopPathOptions,
+} from "./Domain/Entities/ABB6700Path";
 
 // Presentation Managers
 export {
   ABB6700PM,
   makeABB6700PM,
+  type ABB6700PathVM,
   type ABB6700VM,
 } from "./Domain/PMs/ABB6700PM";
 
@@ -53,6 +61,7 @@ export {
 export { setupABB6700InstanceFactory } from "./Domain/Factory/setupABB6700InstanceFactory";
 
 // Use Cases
+export { PlayPathUC, makePlayPathUC } from "./Domain/UCs/PlayPathUC";
 export {
   SetJointAngleUC,
   makeSetJointAngleUC,
@@ -68,6 +77,7 @@ export {
   SetTransitionDurationUC,
   makeSetTransitionDurationUC,
 } from "./Domain/UCs/SetTransitionDurationUC";
+export { StopPathUC, makeStopPathUC } from "./Domain/UCs/StopPathUC";
 
 // Controllers
 export { createABB6700 } from "./Domain/Controllers/createABB6700";
@@ -77,12 +87,19 @@ export { setTransitionDuration } from "./Domain/Controllers/setTransitionDuratio
 export { getPose } from "./Domain/Controllers/getPose";
 export { applyABB6700State } from "./Domain/Controllers/applyABB6700State";
 export { getABB6700State } from "./Domain/Controllers/getABB6700State";
+export { playPath } from "./Domain/Controllers/playPath";
+export { stopPath } from "./Domain/Controllers/stopPath";
+export { onPathSegmentReached } from "./Domain/Controllers/onPathSegmentReached";
+export { onPathCompleted } from "./Domain/Controllers/onPathCompleted";
+export { onPathStopped } from "./Domain/Controllers/onPathStopped";
 
 // Mocks (for consumer testing)
 export { MockABB6700PM } from "./Domain/Mocks/MockABB6700PM";
+export { MockPlayPathUC } from "./Domain/Mocks/MockPlayPathUC";
 export { MockSetJointAngleUC } from "./Domain/Mocks/MockSetJointAngleUC";
 export { MockSetPoseUC } from "./Domain/Mocks/MockSetPoseUC";
 export { MockSetTransitionDurationUC } from "./Domain/Mocks/MockSetTransitionDurationUC";
+export { MockStopPathUC } from "./Domain/Mocks/MockStopPathUC";
 
 // Config
 export { default as componentConfig } from "./component.config";

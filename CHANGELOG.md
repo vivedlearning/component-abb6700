@@ -2,6 +2,100 @@
 
 All notable changes to `@vived/component-ABB6700` will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **Path playback.** `playPath(segments)` on `ABB6700Facade`, and the standalone
+  `playPath(id, segments, appObjects)` controller, play an ordered list of segments
+  as one motion. A segment is a pose, a travel time (`durationMs`) and an optional
+  dwell (`dwellMs`). The component honours the travel times and dwells as given, and
+  the transition duration does not apply to a segment. Each segment's pose is
+  committed to the view model and `getState()` as that segment starts, so no view
+  model carries angles between two segment poses. The first segment starts from the
+  angles on screen. A segment with a travel time of zero snaps to its pose. A segment
+  whose pose equals the one before it still takes its travel time. `playPath`
+  rejects the whole request with a warning, and changes nothing, if the list is
+  empty, a segment has no pose, or any travel time or dwell is negative or not
+  finite. The angles in a pose are not checked, as with `setPose`. Each segment
+  and its pose are copied, so editing the list after the call changes nothing.
+- **`path` on the view model.** `ABB6700VM.path` (`ABB6700PathVM`) reports the path
+  in progress: `playCount`, `segmentIndex`, `phase` (`"moving"`, `"dwelling"` or
+  `"stopping"`), the current segment's `durationMs` and `dwellMs`, and
+  `stopDurationMs`. It is `undefined` when no path is in progress.
+- **Path events.** Three payload-free events: `pathSegmentReached` (the arm has
+  arrived at a segment's pose), `pathCompleted` (the last segment has been reached
+  and its dwell has ended) and `pathStopped` (a path stop has brought the arm to
+  rest). Subscribe with `facade.onEvent(name, cb)`, or with the standalone
+  `onPathSegmentReached`, `onPathCompleted` and `onPathStopped` controllers, which
+  take `(id, appObjects, cb)`. Each returns a function that stops further calls.
+  The callbacks receive no arguments. A callback that throws is reported through
+  `submitError`; the other callbacks still run and the path carries on. Inside `pathSegmentReached`, `vm.path` names
+  the segment reached, in its `"dwelling"` phase, so a host can fire its weld gun
+  for the dwell. For the last segment, `pathSegmentReached` fires before
+  `pathCompleted`.
+- **Path stop.** `stopPath(options?)` on the facade, and the standalone
+  `stopPath(id, appObjects, options?)` controller, stop a path in flight. The
+  rendered arm slows along its current segment from the speed it has on screen. It
+  comes to rest within the stop duration, never passes the segment's pose and never
+  starts another segment. The rest of the path is dropped. The pose the arm rests at
+  is committed to the view model and `getState()`, and then `pathStopped` fires. The
+  stop duration is `400` ms by default (`ABB_6700_DEFAULT_STOP_DURATION_MS`). Pass
+  `{ durationMs }` to change it. A negative or non-finite duration is replaced by the
+  default with a warning, and the stop still happens. A duration of `0` stops the arm
+  where it is. With no path in progress, `stopPath` changes nothing and fires no
+  event. A second stop request while the arm is stopping changes nothing.
+- **Path rendering in the Babylon view.** The view that ships with this release
+  renders paths and path stops. It eases each segment over its travel time, arrives
+  exactly on the segment's pose, holds still for the dwell, and keeps the stabilizer
+  linkage attached throughout. After a late `load()` or a remount during a path, the
+  arm appears directly on the committed pose and the path plays on from there.
+- **New exports.** `ABB_6700_DEFAULT_STOP_DURATION_MS` (`400`); the types
+  `ABB6700StopPathOptions`, `ABB6700PathSegment`, `ABB6700PathPhase`,
+  `ABB6700PathVM` and `ABB6700PathProgress`; `PlayPathUC` and `StopPathUC` (with
+  `makePlayPathUC` and `makeStopPathUC`); and `MockPlayPathUC` and `MockStopPathUC`
+  for consumer tests.
+
+### Heads up for hosts
+
+- **Public types gain required members.** `ABB6700VM` has a new required `path`
+  field, and the exported abstract `ABB6700Entity` gains abstract `path` and
+  `startPath()` members. Hosts that only read view models or drive the arm through
+  the facade or controllers are unaffected. Code that *builds* `ABB6700VM` literals
+  must add `path: undefined` to compile. Code that subclasses `ABB6700Entity` must
+  implement the new members. This is the same kind of change as `snapCount` in 2.2.0.
+- **`ABB6700Events` is no longer empty.** It now lists `pathSegmentReached`,
+  `pathCompleted` and `pathStopped`. An unknown event name still returns a no-op
+  unsubscribe function.
+- **`playPath`, `stopPath` and the events go beyond SmartComponent contract v1.**
+  They are additive, so the facade still satisfies the contract.
+- **A path advances only while the arm's Babylon view renders** (ADR-0007). Before
+  `load()`, a path waits on its first segment: that segment's pose is committed and
+  no event fires. Once the view attaches, that segment counts as reached and the
+  path plays on. A stop completes when the view brings the arm to rest, so a stop
+  with no rendering view stays in its `"stopping"` phase until the view loads and
+  renders. Paths pause while a tab is hidden, because the render loop does. A
+  headless host that waits on `pathCompleted` or `pathStopped` should use
+  `MockPlayPathUC` and `MockStopPathUC` in its tests.
+
+### Changed
+
+- **Pose commands cancel a path.** `setPose`, `setJointAngle` and `applyState`
+  (facade or controller, with or without the snap option) cancel a path in
+  progress, and so does a new `playPath`. A cancelled path fires no event, and the
+  view model reports no path in progress. A pose command during a stop ends the
+  stop: the commanded pose wins and `pathStopped` does not fire.
+
+### Unchanged on purpose
+
+- **`ABB6700State` and its schema version `1`.** A path is never persisted. A
+  snapshot taken mid-path holds the pose committed last.
+- **Pose commands, the snap option and `setTransitionDuration`** behave as in 2.2.0
+  when no path is in progress.
+- **The transition duration does not affect a path.** Changing it during a path does
+  not change the path's timing. The new duration applies to the next pose command
+  after the path.
+
 ## [2.2.0] — 2026-09-23
 
 ### Added

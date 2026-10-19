@@ -3,9 +3,14 @@ import { Angle, makeAppObjectRepo, makeDomainFactoryRepo } from "@vived/core";
 import type { TransformNode } from "@babylonjs/core";
 import {
   ABB6700BabylonView,
+  aBB6700PMAdapter,
   createBabylonABB6700,
   makeABB6700FeatureFactory,
+  playPath,
   setPose,
+  stopPath,
+  type ABB6700PathVM,
+  type ABB6700Pose,
   type ABB6700TransitionOption,
 } from "../src";
 import { makeDevGetAssetBlobURLUC } from "./DevGetAssetBlobURLUC";
@@ -121,23 +126,51 @@ function renderOnce() {
  */
 type PoseDegrees = { j1: number; j2: number; j3: number; j4: number; j5: number; j6: number };
 
+function poseFromDegrees(deg: PoseDegrees): ABB6700Pose {
+  return {
+    j1: Angle.FromDegrees(deg.j1),
+    j2: Angle.FromDegrees(deg.j2),
+    j3: Angle.FromDegrees(deg.j3),
+    j4: Angle.FromDegrees(deg.j4),
+    j5: Angle.FromDegrees(deg.j5),
+    j6: Angle.FromDegrees(deg.j6),
+  };
+}
+
 function setPoseDegrees(
   deg: PoseDegrees,
   options?: ABB6700TransitionOption,
 ): void {
-  setPose(
+  setPose(INSTANCE_ID, poseFromDegrees(deg), appObjects, options);
+}
+
+/** Dev-only: play a path of poses in degrees (the render loop is its clock). */
+function playPathDegrees(
+  segments: { pose: PoseDegrees; durationMs: number; dwellMs?: number }[],
+): void {
+  playPath(
     INSTANCE_ID,
-    {
-      j1: Angle.FromDegrees(deg.j1),
-      j2: Angle.FromDegrees(deg.j2),
-      j3: Angle.FromDegrees(deg.j3),
-      j4: Angle.FromDegrees(deg.j4),
-      j5: Angle.FromDegrees(deg.j5),
-      j6: Angle.FromDegrees(deg.j6),
-    },
+    segments.map(({ pose, ...timing }) => ({
+      pose: poseFromDegrees(pose),
+      ...timing,
+    })),
     appObjects,
-    options,
   );
+}
+
+/** Dev-only: stop the path in flight; the default stop duration when omitted. */
+function stopPlaygroundPath(durationMs?: number): void {
+  stopPath(INSTANCE_ID, appObjects, { durationMs });
+}
+
+/** Dev-only: the latest path VM, or undefined when no path is in progress. */
+let latestPathVM: ABB6700PathVM | undefined;
+aBB6700PMAdapter.subscribe(INSTANCE_ID, appObjects, (vm) => {
+  latestPathVM = vm.path;
+});
+
+function pathVM(): ABB6700PathVM | undefined {
+  return latestPathVM;
 }
 
 function renderedJointDegrees(): PoseDegrees & { frameId: number } {
@@ -165,6 +198,9 @@ declare global {
       renderOnce: typeof renderOnce;
       setPoseDegrees: typeof setPoseDegrees;
       renderedJointDegrees: typeof renderedJointDegrees;
+      playPathDegrees: typeof playPathDegrees;
+      stopPath: typeof stopPlaygroundPath;
+      pathVM: typeof pathVM;
     };
   }
 }
@@ -175,4 +211,7 @@ window.__abb6700Playground = {
   renderOnce,
   setPoseDegrees,
   renderedJointDegrees,
+  playPathDegrees,
+  stopPath: stopPlaygroundPath,
+  pathVM,
 };
