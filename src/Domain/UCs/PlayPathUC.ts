@@ -66,12 +66,13 @@ class PlayPathUCImp extends PlayPathUC {
       return;
     }
 
-    // Record the path, then write its first pose. An observer that issues a
-    // command during the writes replaces or clears the path, and the writes
-    // stop there: the later command wins.
-    entity.startPath(segments);
-    const started = entity.path;
-    writePose(entity, segments[0].pose, () => entity.path === started);
+    // Record the path, then write its first pose from the path's own copy. An
+    // observer that issues a command, as the path appears or during the
+    // writes, replaces or clears the path and the writes stop there: the
+    // later command wins.
+    const started = entity.startPath(segments);
+    if (entity.path !== started) return;
+    writePose(entity, started.segments[0].pose, () => entity.path === started);
   }
 
   segmentReached(playCount: number, segmentIndex: number): void {

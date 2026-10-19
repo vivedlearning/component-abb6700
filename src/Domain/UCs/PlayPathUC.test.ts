@@ -128,6 +128,44 @@ describe("PlayPathUC", () => {
       expect(joints()).toEqual([50, 50, 50, 50, 50, 50]);
     });
 
+    it("yields to a command an observer issues as the path starts, before any write", () => {
+      let tookOver = false;
+      entity.addChangeObserver(() => {
+        if (tookOver || !entity.path) return;
+        // A pose command from a VM subscriber the moment the path appears.
+        tookOver = true;
+        entity.path = undefined;
+        entity.j1 = Angle.FromDegrees(50);
+        entity.j2 = Angle.FromDegrees(50);
+        entity.j3 = Angle.FromDegrees(50);
+        entity.j4 = Angle.FromDegrees(50);
+        entity.j5 = Angle.FromDegrees(50);
+        entity.j6 = Angle.FromDegrees(50);
+      });
+
+      uc.playPath([makeSegment(70)]);
+
+      expect(tookOver).toBe(true);
+      expect(entity.path).toBeUndefined();
+      expect(joints()).toEqual([50, 50, 50, 50, 50, 50]);
+    });
+
+    it("writes the first pose from the path's own copy of the segments", () => {
+      const segments = [makeSegment(70)];
+      let edited = false;
+      entity.addChangeObserver(() => {
+        if (edited || !entity.path) return;
+        // The caller's list is edited while the path is being started.
+        edited = true;
+        segments[0].pose.j1 = Angle.FromDegrees(99);
+      });
+
+      uc.playPath(segments);
+
+      expect(edited).toBe(true);
+      expect(joints()).toEqual(jointsOf(70));
+    });
+
     it("increments the play count on each call", () => {
       uc.playPath(makeSegments());
       expect(entity.path?.playCount).toBe(1);

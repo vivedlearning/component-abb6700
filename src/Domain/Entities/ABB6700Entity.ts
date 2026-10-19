@@ -61,9 +61,12 @@ export abstract class ABB6700Entity extends AppObjectEntity {
 
   /**
    * Increments the play count, then records a new path at its first segment,
-   * moving. Does not write the joints.
+   * moving. Does not write the joints. Returns the path it recorded, which an
+   * observer notified by the recording may already have replaced or cleared.
    */
-  abstract startPath(segments: readonly ABB6700PathSegment[]): void;
+  abstract startPath(
+    segments: readonly ABB6700PathSegment[],
+  ): ABB6700PathProgress;
 
   static get(appObj: AppObject): ABB6700Entity | undefined {
     return appObj.getComponent<ABB6700Entity>(this.type);
@@ -213,9 +216,9 @@ class ABB6700EntityImp extends ABB6700Entity {
     this.notifyOnChange();
   }
 
-  startPath(segments: readonly ABB6700PathSegment[]): void {
+  startPath(segments: readonly ABB6700PathSegment[]): ABB6700PathProgress {
     this._playCount++;
-    this.path = {
+    const started: ABB6700PathProgress = {
       playCount: this._playCount,
       // A copy down to each pose, so the caller's later edits never reach the
       // path in progress (or skip its validation).
@@ -227,6 +230,8 @@ class ABB6700EntityImp extends ABB6700Entity {
       phase: "moving",
       stopDurationMs: 0,
     };
+    this.path = started;
+    return started;
   }
 
   constructor(appObject: AppObject) {
